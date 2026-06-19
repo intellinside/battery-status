@@ -24,15 +24,15 @@ No test suite currently. TypeScript is the primary correctness check — the bui
 **Main** (`src/main/`) — Node.js process, owns all system access:
 - `index.ts` — entry point, wires IPC handlers, starts the polling loop
 - `bluetooth.ts` — spawns `bt-battery.ps1` via `powershell.exe`, parses its JSON output into `ProbeResult[]`
-- `vendor.ts` — reads battery from HID devices that don't surface through Windows PnP (Razer via feature reports, DualSense via input reports)
-- `poller.ts` — merges both probe sources, derives charging state trend, fires low-battery `Notification`s, drives the interval timer
+- `vendor.ts` — reads battery from HID devices that don't surface through Windows PnP (Razer via feature reports, DualSense via input reports); caches the last-working Razer HID path in `razerPath` to avoid reopening every interface each poll
+- `poller.ts` — merges both probe sources, derives charging state trend, fires low-battery `Notification`s, drives the interval timer; uses a `warned` Set to suppress duplicate low-battery notifications until the device recovers above the threshold
 - `store.ts` — `electron-store` wrapper; persists `DeviceRecord` registry + `AppSettings`; exposes `DeviceView` (adds `displayName`) to the renderer
-- `windows.ts` — creates/manages the three `BrowserWindow`s: floating panel, settings, about
+- `windows.ts` — creates/manages the three `BrowserWindow`s: floating panel, settings, about; `broadcast()` sends to all three simultaneously on every update
 - `tray.ts` — tray icon + context menu
 
-**Preload** (`src/preload/index.ts`) — bridges IPC to `window.api` via `contextBridge`. The `Api` type exported here is what the renderer calls.
+**Preload** (`src/preload/index.ts`) — bridges IPC to `window.api` via `contextBridge`. The exported `Api` type is the authoritative contract for what the renderer can call — prefer reading it over the IPC channel strings. Event listener methods (`onDevicesUpdate`, `onSettingsUpdate`) return an unsubscribe function for use in `useEffect` cleanup.
 
-**Renderer** (`src/renderer/`) — React SPA. All three windows share the same bundle; routing is hash-based (`#/panel`, `#/settings`, `#/about`) handled in `App.tsx`.
+**Renderer** (`src/renderer/`) — React SPA. All three windows share the same bundle; routing is hash-based (`#/panel`, `#/settings`, `#/about`) handled in `App.tsx`. Components must not assume which window they're in beyond the URL hash.
 
 ### Data flow
 
@@ -44,6 +44,8 @@ vendor HID     ──┘
 
 The polling loop (`poller.ts`) runs on a configurable interval (`pollIntervalSec`). Each cycle runs both probes in parallel (`Promise.all`), merges results by device id (vendor HID takes priority for battery/charging), updates the `electron-store` registry, and broadcasts the new `DeviceView[]` to all open windows.
 
+New devices default `showOnPanel` and `warnEnabled` to `true` only when `battery !== null` (i.e. unknown-battery devices are hidden by default).
+
 ### IPC channels
 
 | Channel | Direction | Purpose |
@@ -51,6 +53,7 @@ The polling loop (`poller.ts`) runs on a configurable interval (`pollIntervalSec
 | `devices:get` | invoke | fetch current device list |
 | `devices:setConfig` | invoke | patch alias/visibility/warn settings |
 | `devices:refresh` | invoke | force an immediate poll |
+| `devices:reorder` | invoke | persist drag-and-drop sort order |
 | `devices:update` | push | broadcast after each poll |
 | `settings:get` / `settings:set` | invoke | read/write `AppSettings` |
 | `settings:update` | push | broadcast after settings change |
@@ -70,3 +73,14 @@ The polling loop (`poller.ts`) runs on a configurable interval (`pollIntervalSec
 ### Shared types
 
 `src/shared/types.ts` is the contract between all three processes. `ProbeResult` is internal (probe → merge); `DeviceRecord` is persisted; `DeviceView` adds `displayName` and is what the renderer receives.
+
+### Extending AppSettings
+
+Adding a new setting requires four touches:
+
+1. **`src/shared/types.ts`** — add the field to `AppSettings`
+2. **`src/main/store.ts`** — add a default in `defaultSettings` and clamp/validate it in `setSettings`
+3. **`src/renderer/src/pages/Settings.tsx`** — add the UI control, calling `patchSettings({ field: value })`
+4. **Consumer** (e.g. `Panel.tsx`) — read via `getSettings()` / `onSettingsUpdate` and apply
+
+`getSettings()` always spreads `defaultSettings` before the persisted store value, so new fields with defaults are safe to read from existing stores without migration.
