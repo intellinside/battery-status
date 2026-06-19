@@ -1,0 +1,27 @@
+npmRebuild: false
+appId: pro.intellinside.batterystatus
+productName: Battery Status
+copyright: Copyright © 2026 intellinside
+directories:
+  buildResources: resources
+  output: dist
+files:
+  - out/**/*
+  - package.json
+asarUnpack:
+  - "**/node_modules/node-hid/**"
+extraResources:
+  - from: src/main/scripts
+    to: scripts
+    filter:
+      - "**/*.ps1"
+win:
+  target:
+    - nsis
+  icon: resources/icon.ico
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true

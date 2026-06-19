@@ -1,0 +1,72 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project
+
+Windows system-tray Electron app that shows battery levels for paired Bluetooth devices and vendor-specific HID devices (Razer mice, Sony DualSense). Built with electron-vite + React + TypeScript. Windows-only.
+
+## Commands
+
+```bash
+npm run dev        # hot-reload dev mode (electron-vite dev)
+npm run build      # compile to out/
+npm run dist       # build + package NSIS installer → dist/
+npm run dist:dir   # build + package unpacked dir (faster, no installer)
+```
+
+No test suite currently. TypeScript is the primary correctness check — the build will fail on type errors.
+
+## Architecture
+
+### Three Electron processes
+
+**Main** (`src/main/`) — Node.js process, owns all system access:
+- `index.ts` — entry point, wires IPC handlers, starts the polling loop
+- `bluetooth.ts` — spawns `bt-battery.ps1` via `powershell.exe`, parses its JSON output into `ProbeResult[]`
+- `vendor.ts` — reads battery from HID devices that don't surface through Windows PnP (Razer via feature reports, DualSense via input reports)
+- `poller.ts` — merges both probe sources, derives charging state trend, fires low-battery `Notification`s, drives the interval timer
+- `store.ts` — `electron-store` wrapper; persists `DeviceRecord` registry + `AppSettings`; exposes `DeviceView` (adds `displayName`) to the renderer
+- `windows.ts` — creates/manages the three `BrowserWindow`s: floating panel, settings, about
+- `tray.ts` — tray icon + context menu
+
+**Preload** (`src/preload/index.ts`) — bridges IPC to `window.api` via `contextBridge`. The `Api` type exported here is what the renderer calls.
+
+**Renderer** (`src/renderer/`) — React SPA. All three windows share the same bundle; routing is hash-based (`#/panel`, `#/settings`, `#/about`) handled in `App.tsx`.
+
+### Data flow
+
+```
+bt-battery.ps1 ──┐
+                 ├─► poller.ts merge ──► store (DeviceRecord[]) ──► broadcast('devices:update') ──► renderer
+vendor HID     ──┘
+```
+
+The polling loop (`poller.ts`) runs on a configurable interval (`pollIntervalSec`). Each cycle runs both probes in parallel (`Promise.all`), merges results by device id (vendor HID takes priority for battery/charging), updates the `electron-store` registry, and broadcasts the new `DeviceView[]` to all open windows.
+
+### IPC channels
+
+| Channel | Direction | Purpose |
+|---|---|---|
+| `devices:get` | invoke | fetch current device list |
+| `devices:setConfig` | invoke | patch alias/visibility/warn settings |
+| `devices:refresh` | invoke | force an immediate poll |
+| `devices:update` | push | broadcast after each poll |
+| `settings:get` / `settings:set` | invoke | read/write `AppSettings` |
+| `settings:update` | push | broadcast after settings change |
+| `app:info` | invoke | name/version/author |
+| `panel:resize` | send | renderer reports content size so main can resize the frameless panel |
+| `window:action` | send | `closePanel`, `openSettings`, `openAbout`, `quit` |
+
+### Key design constraints
+
+- **Windows-only**: `bt-battery.ps1` uses `Win32_PnPEntity` / `Get-PnpDevice` / `DEVPKEY_Bluetooth_Battery`. There is no cross-platform fallback.
+- **node-hid is native**: `asarUnpack` in `electron-builder.yml` unpacks it so the `.node` binary is accessible at runtime.
+- **PowerShell script ships as `extraResources`**: packaged to `resources/scripts/bt-battery.ps1`; `bluetooth.ts` checks both dev and packaged paths.
+- **Frameless transparent panel**: `resizable: false` on Windows blocks programmatic resize, so `windows.ts` toggles `setResizable` around every `setBounds` call.
+- **Charging state is inferred** for standard BT devices (level went up → charging, down → discharging, same → idle); vendor HID sources report it directly.
+- **Single-instance lock**: a second app launch re-focuses the settings window instead of spawning a new process.
+
+### Shared types
+
+`src/shared/types.ts` is the contract between all three processes. `ProbeResult` is internal (probe → merge); `DeviceRecord` is persisted; `DeviceView` adds `displayName` and is what the renderer receives.

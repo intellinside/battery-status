@@ -1,0 +1,65 @@
+.panel {
+  display: inline-flex;
+  flex-direction: column;
+  /* size to content; the window is resized to match */
+  width: max-content;
+  max-width: 420px;
+  height: auto;
+  /* background is set inline (opacity comes from settings) */
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 6px;
+  overflow: hidden;
+}
+
+.panel__empty {
+  text-align: center;
+  color: var(--fg-dim);
+  padding: 24px 12px;
+}
+
+.device {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 8px;
+  border-radius: 6px;
+  min-width: 0;
+}
+.device--offline {
+  opacity: 0.5;
+}
+
+.device__name {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.device__battery {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--fg);
+  flex-shrink: 0;
+}
+.device__pct {
+  font-variant-numeric: tabular-nums;
+  min-width: 32px;
+  text-align: right;
+  font-weight: 600;
+}
+.device__pct--warn {
+  color: #e5484d;
+}
+
+.panel__compact {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding: 2px;
+}

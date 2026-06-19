@@ -1,0 +1,43 @@
+.about {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  text-align: center;
+  padding: 24px;
+}
+.about__logo {
+  font-size: 56px;
+  line-height: 1;
+}
+.about__name {
+  margin: 12px 0 2px;
+  font-size: 20px;
+}
+.about__version {
+  margin: 0;
+  color: var(--fg-dim);
+}
+.about__desc {
+  margin: 16px 24px;
+  color: var(--fg);
+  line-height: 1.5;
+}
+.about__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 8px;
+}
+.about__meta span {
+  font-size: 11px;
+  color: var(--fg-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.about__copy {
+  margin-top: 18px;
+  font-size: 11px;
+  color: var(--fg-dim);
+}
