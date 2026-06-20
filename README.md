@@ -40,15 +40,16 @@ The panel snaps to a screen corner. You can drag the corner and offset positions
 | Setting | Default | Description |
 |---|---|---|
 | Refresh interval | 60 s | How often battery levels are polled |
-| Default low-battery threshold | 20 % | Threshold applied to newly discovered devices |
+| Dynamic indicator color | Off | Interpolates battery color smoothly from red (≤15%) through orange to green (100%); when off, fixed thresholds apply |
+| Low-battery threshold | 20 % | Battery icon turns red at or below this level; also the default warning threshold for newly discovered devices (fixed-threshold mode only) |
+| Warn color threshold | 40 % | Battery icon turns orange between the low and warn thresholds (fixed-threshold mode only) |
 | Panel background opacity | 85 % | Transparency of the floating panel |
 | Panel corner | Bottom-right | Which screen corner the panel snaps to |
 | Horizontal offset | 8 px | Distance from the left/right screen edge |
 | Vertical offset | 8 px | Distance from the taskbar/top edge |
-| Start automatically | On | Launch the app when you sign in to Windows |
 | Compact panel view | Off | Switch to circular ring display mode |
 | Compact ring size | 48 px | Diameter of each ring in compact mode (24–96 px) |
-| Panel visible | On | Whether the panel is currently shown (persisted across restarts) |
+| Start automatically | On | Launch the app when you sign in to Windows |
 
 ### Settings — Devices tab
 
@@ -57,6 +58,7 @@ Each paired device appears in a table. Per-device options:
 | Column | Description |
 |---|---|
 | Monitor | Show/hide on the panel |
+| State | Online / offline indicator |
 | Type | Device icon (keyboard, mouse, headphones, controller) — click to cycle |
 | Device / alias | Click to rename; the system name is shown in a tooltip |
 | Battery | Last known level |
@@ -133,6 +135,9 @@ src/
         DeviceTypeIcon.tsx      Device type SVG icons
       hooks/
         useDevices.ts   Subscribes to devices:update IPC push events
+        useSettings.ts  Subscribes to settings:update IPC push events
+      utils/
+        battery.ts      levelColor() and isWarning() helpers for color computation
   shared/
     types.ts      Shared type contracts (ProbeResult, DeviceRecord, DeviceView, AppSettings, …)
     ipc.ts        IPC channel name constants (IPC object)
@@ -182,7 +187,7 @@ vendor HID     ──┘
 | `ProbeResult` | Raw row from a probe (bluetooth or vendor HID) |
 | `DeviceRecord` | Persisted device entry (registry + battery history) |
 | `DeviceView` | `DeviceRecord` + `displayName`; what the renderer receives |
-| `AppSettings` | All persisted settings |
+| `AppSettings` | All persisted settings (includes `lowColorThreshold`, `warnColorThreshold`, `dynamicColorMode` for indicator color) |
 | `DeviceConfigPatch` | Partial patch applied by `devices:setConfig` |
 | `ChargingState` | `'charging' \| 'discharging' \| 'idle' \| 'unknown'` |
 | `DeviceType` | `'keyboard' \| 'mouse' \| 'headphones' \| 'controller' \| null` |

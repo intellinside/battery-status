@@ -17,6 +17,10 @@ npm run dist:dir   # build + package unpacked dir (faster, no installer)
 
 No test suite currently. TypeScript is the primary correctness check — the build will fail on type errors.
 
+## Documentation
+
+Any code change that affects architecture, settings, IPC channels, shared types, file structure, or user-facing behaviour must be accompanied by corresponding updates to both `CLAUDE.md` and `README.md`.
+
 ## Architecture
 
 ### Three Electron processes
@@ -34,6 +38,9 @@ No test suite currently. TypeScript is the primary correctness check — the bui
 **Preload** (`src/preload/index.ts`) — bridges IPC to `window.api` via `contextBridge`. The exported `Api` type is the authoritative contract for what the renderer can call. Event listener methods (`onDevicesUpdate`, `onSettingsUpdate`) return an unsubscribe function for use in `useEffect` cleanup. IPC channel names are defined as constants in `src/shared/ipc.ts` (`IPC` object) — always use those, never raw strings.
 
 **Renderer** (`src/renderer/`) — React SPA. All three windows share the same bundle; routing is hash-based (`#/panel`, `#/settings`, `#/about`) handled in `App.tsx`. Components must not assume which window they're in beyond the URL hash.
+- `hooks/useDevices.ts` — subscribes to `devices:update` push events
+- `hooks/useSettings.ts` — subscribes to `settings:update` push events
+- `utils/battery.ts` — `levelColor()` computes indicator color from level + thresholds (fixed or dynamic interpolation); `isWarning()` checks per-device warn state
 
 ### Data flow
 
@@ -74,6 +81,8 @@ New devices default `showOnPanel` and `warnEnabled` to `true` only when `battery
 ### Shared types
 
 `src/shared/types.ts` is the contract between all three processes. `ProbeResult` is internal (probe → merge); `DeviceRecord` is persisted; `DeviceView` adds `displayName` and is what the renderer receives.
+
+`AppSettings` color fields: `lowColorThreshold` (default 20) is both the red-zone boundary and the default per-device warn threshold for new devices; `warnColorThreshold` (default 40) is the upper boundary of the orange zone; `dynamicColorMode` switches to smooth red→orange→green interpolation via `utils/battery.ts`.
 
 `src/shared/ipc.ts` exports the `IPC` constants object with all channel name strings. Use it everywhere instead of raw string literals.
 
