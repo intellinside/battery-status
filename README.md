@@ -24,11 +24,11 @@ Windows system-tray app that shows battery levels for paired Bluetooth devices a
 
 1. Download the NSIS installer from the Releases page and run it.
 2. The app starts automatically and places an icon in the system tray.
-3. Right-click the tray icon to open Settings, show/hide the panel, or quit.
+3. The app starts in the system tray. Left-click the tray icon to show/hide the panel; right-click for Settings, About, and Quit. The hotkey **Alt+B** also toggles the panel.
 
 ### Panel
 
-The floating panel appears in a corner of the screen and lists every device that is currently connected and configured to be shown. Two display modes are available:
+The floating panel appears in a corner of the screen and lists every device that is currently connected and configured to be shown. Toggle it with a left-click on the tray icon or with **Alt+B**. Two display modes are available:
 
 - **List view** (default) — device name + battery percentage with a coloured battery icon
 - **Compact view** — a horizontal strip of circular battery rings (configurable size)
@@ -48,6 +48,7 @@ The panel snaps to a screen corner. You can drag the corner and offset positions
 | Start automatically | On | Launch the app when you sign in to Windows |
 | Compact panel view | Off | Switch to circular ring display mode |
 | Compact ring size | 48 px | Diameter of each ring in compact mode (24–96 px) |
+| Panel visible | On | Whether the panel is currently shown (persisted across restarts) |
 
 ### Settings — Devices tab
 
@@ -81,9 +82,9 @@ Devices whose battery Windows cannot read are still listed in the Devices tab (s
 
 | Layer | Technology |
 |---|---|
-| Framework | Electron 31 + electron-vite |
+| Framework | Electron 42 + electron-vite |
 | UI | React 18 + TypeScript |
-| Build | Vite 5 |
+| Build | Vite 7 |
 | Packaging | electron-builder (NSIS installer) |
 | Persistence | electron-store |
 | HID access | node-hid (native module, asar-unpacked) |
@@ -134,9 +135,10 @@ src/
         useDevices.ts   Subscribes to devices:update IPC push events
   shared/
     types.ts      Shared type contracts (ProbeResult, DeviceRecord, DeviceView, AppSettings, …)
+    ipc.ts        IPC channel name constants (IPC object)
 resources/
-  icon.ico / icon.png   App icon
-  trayTemplate.png      Tray icon (dark mode)
+  icon.ico / icon.png   App icon (installer and window)
+  trayTemplate.png      Legacy tray image (unused — icon is generated at runtime by icons.ts)
 electron-builder.yml    Packaging config
 electron.vite.config.ts Vite config
 ```
@@ -151,9 +153,9 @@ bt-battery.ps1 ──┐
 vendor HID     ──┘
 ```
 
-**Main process** (`src/main/`) owns all system access — filesystem, HID, PowerShell, notifications, windows, tray.
+**Main process** (`src/main/`) owns all system access — filesystem, HID, PowerShell, notifications, windows, tray. It also registers the global hotkey **Alt+B** to toggle the panel.
 
-**Preload** (`src/preload/index.ts`) bridges IPC to `window.api` via `contextBridge`. The exported `Api` type is the authoritative contract — prefer reading it over the raw IPC channel strings.
+**Preload** (`src/preload/index.ts`) bridges IPC to `window.api` via `contextBridge`. The exported `Api` type is the authoritative contract. IPC channel names are centralised in `src/shared/ipc.ts` as the `IPC` constants object — prefer it over raw string literals.
 
 **Renderer** (`src/renderer/`) is a React SPA. All three windows share one bundle; the URL hash (`#/panel`, `#/settings`, `#/about`) selects the active view in `App.tsx`.
 

@@ -22,15 +22,16 @@ No test suite currently. TypeScript is the primary correctness check — the bui
 ### Three Electron processes
 
 **Main** (`src/main/`) — Node.js process, owns all system access:
-- `index.ts` — entry point, wires IPC handlers, starts the polling loop
+- `index.ts` — entry point, wires IPC handlers, starts the polling loop, registers the `Alt+B` global hotkey to toggle the panel
 - `bluetooth.ts` — spawns `bt-battery.ps1` via `powershell.exe`, parses its JSON output into `ProbeResult[]`
 - `vendor.ts` — reads battery from HID devices that don't surface through Windows PnP (Razer via feature reports, DualSense via input reports); caches the last-working Razer HID path in `razerPath` to avoid reopening every interface each poll
 - `poller.ts` — merges both probe sources, derives charging state trend, fires low-battery `Notification`s, drives the interval timer; uses a `warned` Set to suppress duplicate low-battery notifications until the device recovers above the threshold
 - `store.ts` — `electron-store` wrapper; persists `DeviceRecord` registry + `AppSettings`; exposes `DeviceView` (adds `displayName`) to the renderer
 - `windows.ts` — creates/manages the three `BrowserWindow`s: floating panel, settings, about; `broadcast()` sends to all three simultaneously on every update
-- `tray.ts` — tray icon + context menu
+- `tray.ts` — tray icon + context menu; left-click toggles panel, right-click shows menu (Settings / About / Quit)
+- `icons.ts` — generates the tray icon programmatically as an RGBA PNG via `nativeImage` (adapts to dark/light OS theme); the `trayTemplate.png` in resources is unused
 
-**Preload** (`src/preload/index.ts`) — bridges IPC to `window.api` via `contextBridge`. The exported `Api` type is the authoritative contract for what the renderer can call — prefer reading it over the IPC channel strings. Event listener methods (`onDevicesUpdate`, `onSettingsUpdate`) return an unsubscribe function for use in `useEffect` cleanup.
+**Preload** (`src/preload/index.ts`) — bridges IPC to `window.api` via `contextBridge`. The exported `Api` type is the authoritative contract for what the renderer can call. Event listener methods (`onDevicesUpdate`, `onSettingsUpdate`) return an unsubscribe function for use in `useEffect` cleanup. IPC channel names are defined as constants in `src/shared/ipc.ts` (`IPC` object) — always use those, never raw strings.
 
 **Renderer** (`src/renderer/`) — React SPA. All three windows share the same bundle; routing is hash-based (`#/panel`, `#/settings`, `#/about`) handled in `App.tsx`. Components must not assume which window they're in beyond the URL hash.
 
@@ -73,6 +74,8 @@ New devices default `showOnPanel` and `warnEnabled` to `true` only when `battery
 ### Shared types
 
 `src/shared/types.ts` is the contract between all three processes. `ProbeResult` is internal (probe → merge); `DeviceRecord` is persisted; `DeviceView` adds `displayName` and is what the renderer receives.
+
+`src/shared/ipc.ts` exports the `IPC` constants object with all channel name strings. Use it everywhere instead of raw string literals.
 
 ### Extending AppSettings
 
