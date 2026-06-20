@@ -17,6 +17,7 @@ let panel: BrowserWindow | null = null
 let settings: BrowserWindow | null = null
 let about: BrowserWindow | null = null
 let trayRef: Tray | null = null
+let pendingShow = false
 
 /* -------------------------------------------------------------------------- */
 /* Floating panel                                                             */
@@ -87,10 +88,26 @@ function setPanelBounds(width: number, height: number): void {
   const w = Math.min(420, Math.max(40, Math.round(width)))
   const h = Math.min(work.height, Math.max(40, Math.round(height)))
   const { x, y } = computeCorner(w, h)
+  const cur = panel.getBounds()
   // resizable:false blocks programmatic resize on Windows — toggle it around the call.
-  panel.setResizable(true)
-  panel.setBounds({ x, y, width: w, height: h })
-  panel.setResizable(false)
+  // Skip entirely when nothing changed to avoid the setResizable(true/false) style toggle
+  // triggering SWP_FRAMECHANGED while the window is visible (causes DWM blink).
+  if (cur.x !== x || cur.y !== y || cur.width !== w || cur.height !== h) {
+    panel.setResizable(true)
+    panel.setBounds({ x, y, width: w, height: h })
+    panel.setResizable(false)
+  }
+  if (pendingShow) {
+    pendingShow = false
+    panel.setOpacity(0)
+    panel.showInactive()
+    // Defer opacity restore to after the current Win32 message dispatch cycle.
+    // A tray click triggers OS activation messages (WM_ACTIVATEAPP etc.) that
+    // cause DWM to repaint; keeping opacity=0 during that cycle hides the flash.
+    setImmediate(() => {
+      if (panel && !panel.isDestroyed()) panel.setOpacity(1)
+    })
+  }
 }
 
 /** Called from the renderer with its measured content size. */
@@ -112,10 +129,9 @@ export function togglePanel(tray: Tray): void {
     panel.hide()
     setSettings({ panelVisible: false })
   } else {
+    pendingShow = true
     const { width, height } = panel.getBounds()
-    const { x, y } = computeCorner(width, height)
-    panel.setPosition(Math.round(x), Math.round(y))
-    panel.showInactive()
+    setPanelBounds(width, height)
     setSettings({ panelVisible: true })
   }
 }

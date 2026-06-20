@@ -4,6 +4,7 @@ import { useSettings } from '../hooks/useSettings'
 import { isWarning } from '../utils/battery'
 import BatteryIcon from '../components/BatteryIcon'
 import CompactDeviceCircle from '../components/CompactDeviceCircle'
+import DeviceTypeIcon from '../components/DeviceTypeIcon'
 import '../styles/panel.css'
 
 export default function Panel(): JSX.Element {
@@ -67,9 +68,12 @@ export default function Panel(): JSX.Element {
         const warn = isWarning(d)
         return (
           <div className={`device${d.online ? '' : ' device--offline'}`} key={d.id}>
-            <span className="device__name" title={d.displayName}>
-              {d.displayName}
-            </span>
+            <div className="device__left">
+              <DeviceTypeIcon type={d.deviceType} size={14} color="rgba(255,255,255,0.45)" />
+              <span className="device__name" title={d.displayName}>
+                {d.displayName}
+              </span>
+            </div>
             <span className="device__battery">
               <BatteryIcon level={d.lastBattery} charging={d.charging} warn={warn} size={22} />
               <span className={`device__pct${warn ? ' device__pct--warn' : ''}`}>

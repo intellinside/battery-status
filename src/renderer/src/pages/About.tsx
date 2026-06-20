@@ -12,16 +12,16 @@ export default function About(): JSX.Element {
   return (
     <div className="about">
       <div className="about__logo">🔋</div>
-      <h1 className="about__name">{info?.name ?? 'Battery Status'}</h1>
+      <h1 className="about__name">Battery Status</h1>
       <p className="about__version">Version {info?.version ?? '—'}</p>
       <p className="about__desc">
-        Shows the battery level of your connected Bluetooth devices in the system tray.
+        Shows the battery level of your connected devices in the system tray.
       </p>
       <div className="about__meta">
         <span>Developer</span>
         <strong>{info?.author ?? 'intellinside'}</strong>
       </div>
-      <p className="about__copy">© 2026 intellinside · MIT License</p>
+      <p className="about__copy">© 2026 intellinside</p>
     </div>
   )
 }
