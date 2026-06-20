@@ -1,0 +1,13 @@
+export const IPC = {
+  DEVICES_GET: 'devices:get',
+  DEVICES_SET_CONFIG: 'devices:setConfig',
+  DEVICES_REFRESH: 'devices:refresh',
+  DEVICES_REORDER: 'devices:reorder',
+  DEVICES_UPDATE: 'devices:update',
+  SETTINGS_GET: 'settings:get',
+  SETTINGS_SET: 'settings:set',
+  SETTINGS_UPDATE: 'settings:update',
+  APP_INFO: 'app:info',
+  PANEL_RESIZE: 'panel:resize',
+  WINDOW_ACTION: 'window:action',
+} as const

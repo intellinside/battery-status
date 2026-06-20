@@ -1,5 +1,6 @@
 import DeviceTypeIcon from './DeviceTypeIcon'
 import type { ChargingState, DeviceType } from '../../../shared/types'
+import { levelColor } from '../utils/battery'
 
 interface Props {
   level: number | null
@@ -10,11 +11,9 @@ interface Props {
   size?: number
 }
 
-function levelColor(level: number, warn: boolean): string {
-  if (warn || level <= 20) return '#e5484d'
-  if (level <= 40) return '#f5a524'
-  return '#46b450'
-}
+const STROKE_RATIO = 5.5 / 48
+const ICON_RATIO = 0.5
+const BOLT_RATIO = 0.32
 
 export default function CompactDeviceCircle({
   level,
@@ -24,7 +23,7 @@ export default function CompactDeviceCircle({
   warn = false,
   size = 48
 }: Props): JSX.Element {
-  const strokeW = Math.max(1.5, size * 5.5 / 48)
+  const strokeW = Math.max(1.5, size * STROKE_RATIO)
   const r = (size - strokeW) / 2
   const cx = size / 2
   const cy = size / 2
@@ -33,8 +32,8 @@ export default function CompactDeviceCircle({
   const pct = known ? Math.min(100, Math.max(0, level as number)) : 0
   const color = known ? levelColor(pct, warn) : '#6b7079'
   const dashOffset = circumference * (1 - pct / 100)
-  const iconSize = Math.round(size * 0.5)
-  const boltSize = Math.round(size * 0.32)
+  const iconSize = Math.round(size * ICON_RATIO)
+  const boltSize = Math.round(size * BOLT_RATIO)
 
   const tooltip = known
     ? `${displayName} – ${pct}%${charging === 'charging' ? ' (charging)' : ''}`

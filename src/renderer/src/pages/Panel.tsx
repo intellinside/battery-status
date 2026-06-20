@@ -1,16 +1,20 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useDevices } from '../hooks/useDevices'
+import { useSettings } from '../hooks/useSettings'
+import { isWarning } from '../utils/battery'
 import BatteryIcon from '../components/BatteryIcon'
 import CompactDeviceCircle from '../components/CompactDeviceCircle'
 import '../styles/panel.css'
 
 export default function Panel(): JSX.Element {
   const { devices, loading } = useDevices()
+  const settings = useSettings()
   const shown = useMemo(() => devices.filter((d) => d.showOnPanel && d.online), [devices])
-  const [opacity, setOpacity] = useState(85)
-  const [compactPanel, setCompactPanel] = useState(false)
-  const [compactCircleSize, setCompactCircleSize] = useState(48)
   const rootRef = useRef<HTMLDivElement>(null)
+
+  const opacity = settings?.panelOpacity ?? 85
+  const compactPanel = settings?.compactPanel ?? false
+  const compactCircleSize = settings?.compactCircleSize ?? 48
 
   // The panel window is transparent — clear the opaque body background from global.css.
   // overflow:hidden prevents scrollbars during the brief window before the ResizeObserver fires.
@@ -33,20 +37,6 @@ export default function Panel(): JSX.Element {
     return () => observer.disconnect()
   }, [])
 
-  // Background opacity and compact mode are driven by settings, updated live.
-  useEffect(() => {
-    window.api.getSettings().then((s) => {
-      setOpacity(s.panelOpacity)
-      setCompactPanel(s.compactPanel)
-      setCompactCircleSize(s.compactCircleSize)
-    })
-    return window.api.onSettingsUpdate((s) => {
-      setOpacity(s.panelOpacity)
-      setCompactPanel(s.compactPanel)
-      setCompactCircleSize(s.compactCircleSize)
-    })
-  }, [])
-
   const background = `rgba(31, 33, 37, ${Math.min(100, Math.max(0, opacity)) / 100})`
 
   return (
@@ -59,25 +49,22 @@ export default function Panel(): JSX.Element {
 
       {!loading && shown.length > 0 && compactPanel && (
         <div className="panel__compact">
-          {shown.map((d) => {
-            const warn = d.warnEnabled && d.lastBattery !== null && d.lastBattery < d.warnThreshold
-            return (
-              <CompactDeviceCircle
-                key={d.id}
-                level={d.lastBattery}
-                charging={d.charging}
-                deviceType={d.deviceType}
-                displayName={d.displayName}
-                warn={warn}
-                size={compactCircleSize}
-              />
-            )
-          })}
+          {shown.map((d) => (
+            <CompactDeviceCircle
+              key={d.id}
+              level={d.lastBattery}
+              charging={d.charging}
+              deviceType={d.deviceType}
+              displayName={d.displayName}
+              warn={isWarning(d)}
+              size={compactCircleSize}
+            />
+          ))}
         </div>
       )}
 
       {!loading && shown.length > 0 && !compactPanel && shown.map((d) => {
-        const warn = d.warnEnabled && d.lastBattery !== null && d.lastBattery < d.warnThreshold
+        const warn = isWarning(d)
         return (
           <div className={`device${d.online ? '' : ' device--offline'}`} key={d.id}>
             <span className="device__name" title={d.displayName}>

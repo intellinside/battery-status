@@ -148,7 +148,7 @@ export default function DeviceRow({
       {editOpen &&
         createPortal(
           <div className="modal-overlay" onClick={() => setEditOpen(false)}>
-            <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.key === 'Escape' && setEditOpen(false)}>
               <h3 className="modal__title">Edit device</h3>
 
               <div className="modal__device-name">{device.displayName}</div>

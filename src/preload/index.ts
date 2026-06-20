@@ -6,42 +6,43 @@ import type {
   DeviceView,
   WindowAction
 } from '../shared/types'
+import { IPC } from '../shared/ipc'
 
 const api = {
-  getDevices: (): Promise<DeviceView[]> => ipcRenderer.invoke('devices:get'),
+  getDevices: (): Promise<DeviceView[]> => ipcRenderer.invoke(IPC.DEVICES_GET),
 
   setDeviceConfig: (id: string, patch: DeviceConfigPatch): Promise<DeviceView[]> =>
-    ipcRenderer.invoke('devices:setConfig', id, patch),
+    ipcRenderer.invoke(IPC.DEVICES_SET_CONFIG, id, patch),
 
-  refreshDevices: (): Promise<DeviceView[]> => ipcRenderer.invoke('devices:refresh'),
+  refreshDevices: (): Promise<DeviceView[]> => ipcRenderer.invoke(IPC.DEVICES_REFRESH),
 
   reorderDevices: (ids: string[]): Promise<DeviceView[]> =>
-    ipcRenderer.invoke('devices:reorder', ids),
+    ipcRenderer.invoke(IPC.DEVICES_REORDER, ids),
 
   onDevicesUpdate: (cb: (devices: DeviceView[]) => void): (() => void) => {
     const handler = (_e: unknown, devices: DeviceView[]): void => cb(devices)
-    ipcRenderer.on('devices:update', handler)
-    return () => ipcRenderer.removeListener('devices:update', handler)
+    ipcRenderer.on(IPC.DEVICES_UPDATE, handler)
+    return () => ipcRenderer.removeListener(IPC.DEVICES_UPDATE, handler)
   },
 
-  getSettings: (): Promise<AppSettings> => ipcRenderer.invoke('settings:get'),
+  getSettings: (): Promise<AppSettings> => ipcRenderer.invoke(IPC.SETTINGS_GET),
 
   setSettings: (patch: Partial<AppSettings>): Promise<AppSettings> =>
-    ipcRenderer.invoke('settings:set', patch),
+    ipcRenderer.invoke(IPC.SETTINGS_SET, patch),
 
   onSettingsUpdate: (cb: (settings: AppSettings) => void): (() => void) => {
     const handler = (_e: unknown, settings: AppSettings): void => cb(settings)
-    ipcRenderer.on('settings:update', handler)
-    return () => ipcRenderer.removeListener('settings:update', handler)
+    ipcRenderer.on(IPC.SETTINGS_UPDATE, handler)
+    return () => ipcRenderer.removeListener(IPC.SETTINGS_UPDATE, handler)
   },
 
-  getAppInfo: (): Promise<AppInfo> => ipcRenderer.invoke('app:info'),
+  getAppInfo: (): Promise<AppInfo> => ipcRenderer.invoke(IPC.APP_INFO),
 
   reportPanelSize: (width: number, height: number): void =>
-    ipcRenderer.send('panel:resize', { width, height }),
+    ipcRenderer.send(IPC.PANEL_RESIZE, { width, height }),
 
   windowAction: (action: WindowAction): void =>
-    ipcRenderer.send('window:action', action)
+    ipcRenderer.send(IPC.WINDOW_ACTION, action)
 }
 
 export type Api = typeof api

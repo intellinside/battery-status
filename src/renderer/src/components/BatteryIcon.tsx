@@ -1,16 +1,11 @@
 import type { ChargingState } from '../../../shared/types'
+import { levelColor } from '../utils/battery'
 
 interface Props {
   level: number | null
   charging: ChargingState
   warn?: boolean
   size?: number
-}
-
-function levelColor(level: number, warn: boolean): string {
-  if (warn || level <= 20) return '#e5484d'
-  if (level <= 40) return '#f5a524'
-  return '#46b450'
 }
 
 /** SVG battery whose fill scales with the charge level, with a charging bolt overlay. */

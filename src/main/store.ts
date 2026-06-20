@@ -79,10 +79,6 @@ export function reorderDevices(orderedIds: string[]): DeviceView[] {
   return getDeviceViews()
 }
 
-export function getDeviceRecords(): DeviceRecord[] {
-  return Object.values(rawDevices())
-}
-
 export function updateDeviceConfig(id: string, patch: DeviceConfigPatch): void {
   const devices = rawDevices()
   const existing = devices[id]

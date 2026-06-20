@@ -65,7 +65,7 @@ export default function DeviceTypeIcon({ type, size = 16, color = 'currentColor'
         </svg>
       )
 
-    default:
+    case null:
       return (
         <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-label="Device">
           <rect x="5" y="7.5" width="6" height="5" rx="1" stroke={color} strokeWidth="1.2" />

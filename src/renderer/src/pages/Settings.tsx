@@ -17,6 +17,12 @@ export default function Settings(): JSX.Element {
   const [dropTarget, setDropTarget] = useState<{ id: string; position: 'before' | 'after' } | null>(null)
   const dragSrcId = useRef<string | null>(null)
 
+  const resetDrag = (): void => {
+    setDragging(false)
+    setDropTarget(null)
+    dragSrcId.current = null
+  }
+
   useEffect(() => {
     window.api.getSettings().then(setSettings)
   }, [])
@@ -49,18 +55,14 @@ export default function Settings(): JSX.Element {
   const handleDrop = (targetId: string): void => {
     const srcId = dragSrcId.current
     if (!srcId || srcId === targetId) {
-      setDragging(false)
-      setDropTarget(null)
-      dragSrcId.current = null
+      resetDrag()
       return
     }
 
     const srcIndex = localDevices.findIndex((d) => d.id === srcId)
     const tgtIndex = localDevices.findIndex((d) => d.id === targetId)
     if (srcIndex === -1 || tgtIndex === -1) {
-      setDragging(false)
-      setDropTarget(null)
-      dragSrcId.current = null
+      resetDrag()
       return
     }
 
@@ -72,17 +74,12 @@ export default function Settings(): JSX.Element {
     reordered.splice(insertSlot, 0, moved)
 
     setLocalDevices(reordered)
-    setDragging(false)
-    setDropTarget(null)
-    dragSrcId.current = null
-
+    resetDrag()
     window.api.reorderDevices(reordered.map((d) => d.id))
   }
 
   const handleDragEnd = (): void => {
-    setDragging(false)
-    setDropTarget(null)
-    dragSrcId.current = null
+    resetDrag()
   }
 
   return (

@@ -30,7 +30,3 @@ export function createTray(): Tray {
 
   return tray
 }
-
-export function getTray(): Tray | null {
-  return tray
-}

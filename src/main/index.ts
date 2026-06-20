@@ -19,9 +19,7 @@ import {
   reorderDevices
 } from './store'
 import type { AppInfo, AppSettings, DeviceConfigPatch, WindowAction } from '../shared/types'
-
-const DEVICES_UPDATE = 'devices:update'
-const SETTINGS_UPDATE = 'settings:update'
+import { IPC } from '../shared/ipc'
 
 // Single-instance: a second launch should just surface the existing app.
 const gotLock = app.requestSingleInstanceLock()
@@ -46,12 +44,14 @@ async function start(): Promise<void> {
 
   const t = createTray()
   globalShortcut.register('Alt+B', () => togglePanel(t))
-  registerIpc()
+  registerDeviceIpc()
+  registerSettingsIpc()
+  registerWindowIpc()
 
   const settings = getSettings()
   applyAutoLaunch(settings.autoLaunch)
 
-  startPolling((devices) => broadcast(DEVICES_UPDATE, devices))
+  startPolling((devices) => broadcast(IPC.DEVICES_UPDATE, devices))
 
   if (settings.panelVisible !== false) {
     showPanelOnStartup(t)
@@ -61,32 +61,34 @@ async function start(): Promise<void> {
   app.on('window-all-closed', (e: Electron.Event) => e.preventDefault())
 }
 
-function registerIpc(): void {
-  ipcMain.handle('devices:get', () => getDeviceViews())
+function registerDeviceIpc(): void {
+  ipcMain.handle(IPC.DEVICES_GET, () => getDeviceViews())
 
-  ipcMain.handle('devices:setConfig', (_e, id: string, patch: DeviceConfigPatch) => {
+  ipcMain.handle(IPC.DEVICES_SET_CONFIG, (_e, id: string, patch: DeviceConfigPatch) => {
     updateDeviceConfig(id, patch)
     const views = getDeviceViews()
-    broadcast(DEVICES_UPDATE, views)
+    broadcast(IPC.DEVICES_UPDATE, views)
     return views
   })
 
-  ipcMain.handle('devices:refresh', async () => {
+  ipcMain.handle(IPC.DEVICES_REFRESH, async () => {
     await runOnce()
     return getDeviceViews()
   })
 
-  ipcMain.handle('devices:reorder', (_e, ids: string[]) => {
+  ipcMain.handle(IPC.DEVICES_REORDER, (_e, ids: string[]) => {
     const views = reorderDevices(ids)
-    broadcast(DEVICES_UPDATE, views)
+    broadcast(IPC.DEVICES_UPDATE, views)
     return views
   })
+}
 
-  ipcMain.handle('settings:get', (): AppSettings => getSettings())
+function registerSettingsIpc(): void {
+  ipcMain.handle(IPC.SETTINGS_GET, (): AppSettings => getSettings())
 
-  ipcMain.handle('settings:set', (_e, patch: Partial<AppSettings>): AppSettings => {
+  ipcMain.handle(IPC.SETTINGS_SET, (_e, patch: Partial<AppSettings>): AppSettings => {
     const next = setSettings(patch)
-    broadcast(SETTINGS_UPDATE, next)
+    broadcast(IPC.SETTINGS_UPDATE, next)
 
     if (patch.autoLaunch !== undefined) applyAutoLaunch(next.autoLaunch)
     if (patch.pollIntervalSec !== undefined) reschedulePolling()
@@ -100,13 +102,15 @@ function registerIpc(): void {
     }
     return next
   })
+}
 
-  ipcMain.on('panel:resize', (_e, size: { width: number; height: number }) => {
+function registerWindowIpc(): void {
+  ipcMain.on(IPC.PANEL_RESIZE, (_e, size: { width: number; height: number }) => {
     resizePanel(size.width, size.height)
   })
 
   ipcMain.handle(
-    'app:info',
+    IPC.APP_INFO,
     (): AppInfo => ({
       name: app.getName(),
       version: app.getVersion(),
@@ -114,7 +118,7 @@ function registerIpc(): void {
     })
   )
 
-  ipcMain.on('window:action', (_e, action: WindowAction) => {
+  ipcMain.on(IPC.WINDOW_ACTION, (_e, action: WindowAction) => {
     switch (action) {
       case 'closePanel':
         hidePanel()
