@@ -1,4 +1,4 @@
-import { app, ipcMain } from 'electron'
+import { app, globalShortcut, ipcMain } from 'electron'
 import { createTray } from './tray'
 import {
   broadcast,
@@ -7,7 +7,8 @@ import {
   resizePanel,
   showAbout,
   showSettings,
-  showPanelOnStartup
+  showPanelOnStartup,
+  togglePanel
 } from './windows'
 import { reschedulePolling, runOnce, startPolling, stopPolling } from './poller'
 import {
@@ -44,6 +45,7 @@ async function start(): Promise<void> {
   app.setAppUserModelId('pro.intellinside.batterystatus')
 
   const t = createTray()
+  globalShortcut.register('Alt+B', () => togglePanel(t))
   registerIpc()
 
   const settings = getSettings()
@@ -131,3 +133,4 @@ function registerIpc(): void {
 }
 
 app.on('before-quit', () => stopPolling())
+app.on('will-quit', () => globalShortcut.unregisterAll())

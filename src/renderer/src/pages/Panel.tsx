@@ -54,7 +54,7 @@ export default function Panel(): JSX.Element {
       {loading && <div className="panel__empty">Loading…</div>}
 
       {!loading && shown.length === 0 && (
-        <div className="panel__empty">No devices selected</div>
+        <div className="panel__empty">...</div>
       )}
 
       {!loading && shown.length > 0 && compactPanel && (

@@ -14,7 +14,7 @@ export default function Settings(): JSX.Element {
   const [refreshing, setRefreshing] = useState(false)
   const [localDevices, setLocalDevices] = useState<DeviceView[]>([])
   const [dragging, setDragging] = useState(false)
-  const [dragOverId, setDragOverId] = useState<string | null>(null)
+  const [dropTarget, setDropTarget] = useState<{ id: string; position: 'before' | 'after' } | null>(null)
   const dragSrcId = useRef<string | null>(null)
 
   useEffect(() => {
@@ -41,14 +41,16 @@ export default function Settings(): JSX.Element {
 
   const handleDragOver = (e: React.DragEvent, id: string): void => {
     e.preventDefault()
-    setDragOverId(id)
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const position: 'before' | 'after' = e.clientY < rect.top + rect.height / 2 ? 'before' : 'after'
+    setDropTarget({ id, position })
   }
 
   const handleDrop = (targetId: string): void => {
     const srcId = dragSrcId.current
     if (!srcId || srcId === targetId) {
       setDragging(false)
-      setDragOverId(null)
+      setDropTarget(null)
       dragSrcId.current = null
       return
     }
@@ -57,18 +59,21 @@ export default function Settings(): JSX.Element {
     const tgtIndex = localDevices.findIndex((d) => d.id === targetId)
     if (srcIndex === -1 || tgtIndex === -1) {
       setDragging(false)
-      setDragOverId(null)
+      setDropTarget(null)
       dragSrcId.current = null
       return
     }
 
+    const position = dropTarget?.position ?? 'after'
+    let insertSlot = position === 'before' ? tgtIndex : tgtIndex + 1
     const reordered = [...localDevices]
     const [moved] = reordered.splice(srcIndex, 1)
-    reordered.splice(tgtIndex, 0, moved)
+    if (insertSlot > srcIndex) insertSlot--
+    reordered.splice(insertSlot, 0, moved)
 
     setLocalDevices(reordered)
     setDragging(false)
-    setDragOverId(null)
+    setDropTarget(null)
     dragSrcId.current = null
 
     window.api.reorderDevices(reordered.map((d) => d.id))
@@ -76,7 +81,7 @@ export default function Settings(): JSX.Element {
 
   const handleDragEnd = (): void => {
     setDragging(false)
-    setDragOverId(null)
+    setDropTarget(null)
     dragSrcId.current = null
   }
 
@@ -250,7 +255,11 @@ export default function Settings(): JSX.Element {
                       onDragOver={(e) => handleDragOver(e, d.id)}
                       onDrop={() => handleDrop(d.id)}
                       onDragEnd={handleDragEnd}
-                      isDragOver={dragOverId === d.id && dragSrcId.current !== d.id}
+                      dropIndicator={
+                        dropTarget?.id === d.id && dragSrcId.current !== d.id
+                          ? dropTarget.position
+                          : null
+                      }
                     />
                   ))}
                 </tbody>

@@ -11,7 +11,7 @@ interface Props {
   onDragOver: (e: React.DragEvent) => void
   onDrop: () => void
   onDragEnd: () => void
-  isDragOver: boolean
+  dropIndicator: 'before' | 'after' | null
 }
 
 interface EditState {
@@ -28,7 +28,7 @@ export default function DeviceRow({
   onDragOver,
   onDrop,
   onDragEnd,
-  isDragOver
+  dropIndicator
 }: Props): JSX.Element {
   const [editOpen, setEditOpen] = useState(false)
   const [edit, setEdit] = useState<EditState>({
@@ -59,7 +59,11 @@ export default function DeviceRow({
     setEditOpen(false)
   }
 
-  const rowClass = [device.online ? '' : 'row--offline', isDragOver ? 'row--drag-over' : '']
+  const rowClass = [
+    device.online ? '' : 'row--offline',
+    dropIndicator === 'before' ? 'row--drag-over-before' : '',
+    dropIndicator === 'after' ? 'row--drag-over-after' : ''
+  ]
     .filter(Boolean)
     .join(' ')
 

@@ -111,6 +111,7 @@
 
 .col-status {
   width: 1%;
+  text-align: center;
   white-space: nowrap;
 }
 .dot {
@@ -348,7 +349,10 @@
 .drag-handle:hover {
   opacity: 0.85;
 }
-.row--drag-over > td {
+.row--drag-over-before > td {
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+.row--drag-over-after > td {
   box-shadow: inset 0 -2px 0 var(--accent);
 }
 
