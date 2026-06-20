@@ -9,14 +9,16 @@ interface StoreSchema {
 const defaultSettings: AppSettings = {
   pollIntervalSec: 60,
   autoLaunch: true,
-  lowBatteryDefault: 20,
+  lowColorThreshold: 20,
   panelOpacity: 85,
   panelCorner: 'bottom-right',
   panelMarginX: 8,
   panelMarginY: 8,
   panelVisible: true,
   compactPanel: false,
-  compactCircleSize: 48
+  compactCircleSize: 48,
+  warnColorThreshold: 40,
+  dynamicColorMode: false
 }
 
 const store = new Store<StoreSchema>({
@@ -36,6 +38,7 @@ export function setSettings(patch: Partial<AppSettings>): AppSettings {
   next.panelMarginX = Math.min(1000, Math.max(0, Math.round(next.panelMarginX)))
   next.panelMarginY = Math.min(1000, Math.max(0, Math.round(next.panelMarginY)))
   next.compactCircleSize = Math.min(96, Math.max(24, Math.round(next.compactCircleSize)))
+  next.warnColorThreshold = Math.min(100, Math.max(1, Math.round(next.warnColorThreshold)))
   store.set('settings', next)
   return next
 }

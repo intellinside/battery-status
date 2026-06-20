@@ -30,7 +30,7 @@ export interface DeviceView extends DeviceRecord {
 export interface AppSettings {
   pollIntervalSec: number
   autoLaunch: boolean
-  lowBatteryDefault: number
+  lowColorThreshold: number
   /** Background opacity of the status panel, 0–100 (%). */
   panelOpacity: number
   /** Screen corner the panel snaps to. */
@@ -45,6 +45,10 @@ export interface AppSettings {
   compactPanel: boolean
   /** Diameter (px) of each ring in compact mode. Default 48. Range 12–96. */
   compactCircleSize: number
+  /** Upper boundary of the orange zone; above this shows green. Default 40. Used when dynamicColorMode is false. */
+  warnColorThreshold: number
+  /** When true, indicator color interpolates red→orange→green by percentage instead of fixed thresholds. */
+  dynamicColorMode: boolean
 }
 
 export type PanelCorner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'

@@ -59,6 +59,12 @@
   color: var(--fg);
   flex-shrink: 0;
 }
+
+.device__battery svg{
+  position: relative;
+  top: 1px;
+}
+
 .device__pct {
   font-variant-numeric: tabular-nums;
   min-width: 32px;

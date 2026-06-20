@@ -16,6 +16,9 @@ export default function Panel(): JSX.Element {
   const opacity = settings?.panelOpacity ?? 85
   const compactPanel = settings?.compactPanel ?? false
   const compactCircleSize = settings?.compactCircleSize ?? 48
+  const lowThreshold = settings?.lowColorThreshold ?? 20
+  const warnColorThreshold = settings?.warnColorThreshold ?? 40
+  const dynamicColorMode = settings?.dynamicColorMode ?? false
 
   // The panel window is transparent — clear the opaque body background from global.css.
   // overflow:hidden prevents scrollbars during the brief window before the ResizeObserver fires.
@@ -59,6 +62,9 @@ export default function Panel(): JSX.Element {
               displayName={d.displayName}
               warn={isWarning(d)}
               size={compactCircleSize}
+              lowThreshold={lowThreshold}
+              warnColorThreshold={warnColorThreshold}
+              dynamicColorMode={dynamicColorMode}
             />
           ))}
         </div>
@@ -75,7 +81,15 @@ export default function Panel(): JSX.Element {
               </span>
             </div>
             <span className="device__battery">
-              <BatteryIcon level={d.lastBattery} charging={d.charging} warn={warn} size={22} />
+              <BatteryIcon
+                level={d.lastBattery}
+                charging={d.charging}
+                warn={warn}
+                size={22}
+                lowThreshold={lowThreshold}
+                warnColorThreshold={warnColorThreshold}
+                dynamicColorMode={dynamicColorMode}
+              />
               <span className={`device__pct${warn ? ' device__pct--warn' : ''}`}>
                 {d.lastBattery !== null ? `${d.lastBattery}%` : '—'}
               </span>

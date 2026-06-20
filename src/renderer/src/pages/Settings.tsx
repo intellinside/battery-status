@@ -115,18 +115,44 @@ export default function Settings(): JSX.Element {
               />
             </label>
 
-            <label className="field">
-              <span>Default low-battery threshold (%)</span>
+            <label className="field field--check">
               <input
-                type="number"
-                min={1}
-                max={100}
-                value={settings.lowBatteryDefault}
-                onChange={(e) =>
-                  patchSettings({ lowBatteryDefault: Number(e.target.value) })
-                }
+                type="checkbox"
+                checked={settings.dynamicColorMode}
+                onChange={(e) => patchSettings({ dynamicColorMode: e.target.checked })}
               />
+              <span>Dynamic indicator color</span>
             </label>
+
+            {!settings.dynamicColorMode && (
+              <>
+                <label className="field">
+                  <span>Low-battery threshold (%)</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={settings.lowColorThreshold}
+                    onChange={(e) =>
+                      patchSettings({ lowColorThreshold: Number(e.target.value) })
+                    }
+                  />
+                </label>
+
+                <label className="field">
+                  <span>Warn color threshold (%)</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={settings.warnColorThreshold}
+                    onChange={(e) =>
+                      patchSettings({ warnColorThreshold: Number(e.target.value) })
+                    }
+                  />
+                </label>
+              </>
+            )}
 
             <label className="field">
               <span>Panel background opacity</span>
@@ -182,15 +208,6 @@ export default function Settings(): JSX.Element {
             <label className="field field--check">
               <input
                 type="checkbox"
-                checked={settings.autoLaunch}
-                onChange={(e) => patchSettings({ autoLaunch: e.target.checked })}
-              />
-              <span>Start automatically when I sign in to Windows</span>
-            </label>
-
-            <label className="field field--check">
-              <input
-                type="checkbox"
                 checked={settings.compactPanel}
                 onChange={(e) => patchSettings({ compactPanel: e.target.checked })}
               />
@@ -212,10 +229,14 @@ export default function Settings(): JSX.Element {
                 </span>
               </label>
             )}
-
-            <p className="hint">
-              Auto-launch applies to the installed app. In a development run it has no effect.
-            </p>
+            <label className="field field--check">
+              <input
+                  type="checkbox"
+                  checked={settings.autoLaunch}
+                  onChange={(e) => patchSettings({ autoLaunch: e.target.checked })}
+              />
+              <span>Start automatically when I sign in to Windows</span>
+            </label>
           </section>
         )}
 

@@ -6,6 +6,9 @@ interface Props {
   charging: ChargingState
   warn?: boolean
   size?: number
+  lowThreshold?: number
+  warnColorThreshold?: number
+  dynamicColorMode?: boolean
 }
 
 /** SVG battery whose fill scales with the charge level, with a charging bolt overlay. */
@@ -13,7 +16,10 @@ export default function BatteryIcon({
   level,
   charging,
   warn = false,
-  size = 34
+  size = 34,
+  lowThreshold = 20,
+  warnColorThreshold = 40,
+  dynamicColorMode = false
 }: Props): JSX.Element {
   const width = size
   const height = size * 0.5
@@ -23,7 +29,7 @@ export default function BatteryIcon({
   const known = level !== null && !Number.isNaN(level)
   const pct = known ? Math.min(100, Math.max(0, level as number)) : 0
   const fillW = ((bodyW - pad * 2) * pct) / 100
-  const color = known ? levelColor(pct, warn) : '#9aa0a6'
+  const color = known ? levelColor(pct, warn, lowThreshold, warnColorThreshold, dynamicColorMode) : '#9aa0a6'
 
   return (
     <svg

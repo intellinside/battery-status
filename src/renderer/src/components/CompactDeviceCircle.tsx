@@ -9,6 +9,9 @@ interface Props {
   displayName: string
   warn?: boolean
   size?: number
+  lowThreshold?: number
+  warnColorThreshold?: number
+  dynamicColorMode?: boolean
 }
 
 const STROKE_RATIO = 5.5 / 48
@@ -21,7 +24,10 @@ export default function CompactDeviceCircle({
   deviceType,
   displayName,
   warn = false,
-  size = 48
+  size = 48,
+  lowThreshold = 20,
+  warnColorThreshold = 40,
+  dynamicColorMode = false
 }: Props): JSX.Element {
   const strokeW = Math.max(1.5, size * STROKE_RATIO)
   const r = (size - strokeW) / 2
@@ -30,7 +36,7 @@ export default function CompactDeviceCircle({
   const circumference = 2 * Math.PI * r
   const known = level !== null && !Number.isNaN(level)
   const pct = known ? Math.min(100, Math.max(0, level as number)) : 0
-  const color = known ? levelColor(pct, warn) : '#6b7079'
+  const color = known ? levelColor(pct, warn, lowThreshold, warnColorThreshold, dynamicColorMode) : '#6b7079'
   const dashOffset = circumference * (1 - pct / 100)
   const iconSize = Math.round(size * ICON_RATIO)
   const boltSize = Math.round(size * BOLT_RATIO)

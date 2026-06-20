@@ -72,7 +72,7 @@ function merge(results: ProbeResult[]): DeviceView[] {
       alias: existing?.alias ?? null,
       showOnPanel: existing?.showOnPanel ?? (r.battery !== null),
       warnEnabled: existing?.warnEnabled ?? (r.battery !== null),
-      warnThreshold: existing?.warnThreshold ?? settings.lowBatteryDefault,
+      warnThreshold: existing?.warnThreshold ?? settings.lowColorThreshold,
       lastBattery,
       prevBattery,
       charging,
