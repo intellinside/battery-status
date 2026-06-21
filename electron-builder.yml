@@ -17,6 +17,7 @@ win:
   target:
     - nsis
   icon: resources/icon.ico
+  artifactName: "Battery-Status-Setup-${version}.${ext}"
 nsis:
   oneClick: false
   perMachine: false
