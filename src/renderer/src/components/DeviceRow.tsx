@@ -124,7 +124,7 @@ export default function DeviceRow({
 
         <td className="col-warn">
           {device.warnEnabled && (
-            <span className="warn-label">{'< ' + device.warnThreshold + '%'}</span>
+            <span className="warn-label">{device.warnThreshold + '%'}</span>
           )}
         </td>
 
@@ -219,7 +219,7 @@ export default function DeviceRow({
                     checked={edit.warnEnabled}
                     onChange={(e) => setEdit((s) => ({ ...s, warnEnabled: e.target.checked }))}
                   />
-                  <span className="modal__label">Notification below</span>
+                  <span className="modal__label">Notification at</span>
                 </label>
                 <input
                   type="number"

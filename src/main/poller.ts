@@ -109,7 +109,7 @@ function merge(results: ProbeResult[]): DeviceView[] {
 
 function evaluateWarning(d: DeviceRecord): void {
   if (!d.warnEnabled || !d.online || d.lastBattery === null) return
-  if (d.lastBattery < d.warnThreshold) {
+  if (d.lastBattery <= d.warnThreshold) {
     if (!warned.has(d.id)) {
       warned.add(d.id)
       notifyLowBattery(d)
@@ -123,7 +123,7 @@ function notifyLowBattery(d: DeviceRecord): void {
   if (!Notification.isSupported()) return
   new Notification({
     title: 'Low battery',
-    body: `${resolveDisplayName(d)} is at ${d.lastBattery}% (below ${d.warnThreshold}%).`,
+    body: `${resolveDisplayName(d)} is at ${d.lastBattery}% (at or below ${d.warnThreshold}%).`,
     silent: false
   }).show()
 }

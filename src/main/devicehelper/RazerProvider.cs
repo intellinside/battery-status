@@ -93,7 +93,7 @@ sealed class RazerProvider : IDeviceProvider
 
                 var next = new DeviceState(devId, iface.Name, devId, true, battery, charging);
                 if (!_devices.TryGetValue(devId, out var prev)
-                    || prev.Battery != battery || prev.Charging != charging)
+                    || !prev.Online || prev.Battery != battery || prev.Charging != charging)
                 {
                     _devices[devId] = next;
                     changed = true;
@@ -102,11 +102,21 @@ sealed class RazerProvider : IDeviceProvider
                 break;
             }
 
-            // Register as online-only so it appears in Settings even if battery unreadable.
-            if (!hit && !_devices.ContainsKey(devId) && ifaces.Count > 0)
+            if (!hit)
             {
-                _devices[devId] = new DeviceState(devId, ifaces[0].Name, devId, true, null, null);
-                changed = true;
+                if (!_devices.ContainsKey(devId) && ifaces.Count > 0)
+                {
+                    // Register as online-only so it appears in Settings even if battery unreadable.
+                    _devices[devId] = new DeviceState(devId, ifaces[0].Name, devId, true, null, null);
+                    changed = true;
+                }
+                else if (_devices.TryGetValue(devId, out var prev) && prev.Online)
+                {
+                    // All interface queries failed — device is physically gone but Removed event
+                    // didn't fire yet (or won't). Mark offline so UI reflects actual state.
+                    _devices[devId] = prev with { Online = false, Battery = null, Charging = null };
+                    changed = true;
+                }
             }
         }
 

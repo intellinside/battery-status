@@ -128,35 +128,31 @@ export default function Settings(): JSX.Element {
               <span>Dynamic indicator color</span>
             </label>
 
-            {!settings.dynamicColorMode && (
-              <>
-                <label className="field">
-                  <span>Low-battery threshold (%)</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={100}
-                    value={settings.lowColorThreshold}
-                    onChange={(e) =>
-                      patchSettings({ lowColorThreshold: Number(e.target.value) })
-                    }
-                  />
-                </label>
+            <label className="field">
+              <span>Low-battery threshold (%)</span>
+              <input
+                type="number"
+                min={1}
+                max={100}
+                value={settings.lowColorThreshold}
+                onChange={(e) =>
+                  patchSettings({ lowColorThreshold: Number(e.target.value) })
+                }
+              />
+            </label>
 
-                <label className="field">
-                  <span>Warn color threshold (%)</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={100}
-                    value={settings.warnColorThreshold}
-                    onChange={(e) =>
-                      patchSettings({ warnColorThreshold: Number(e.target.value) })
-                    }
-                  />
-                </label>
-              </>
-            )}
+            <label className="field">
+              <span>Warn color threshold (%)</span>
+              <input
+                type="number"
+                min={1}
+                max={100}
+                value={settings.warnColorThreshold}
+                onChange={(e) =>
+                  patchSettings({ warnColorThreshold: Number(e.target.value) })
+                }
+              />
+            </label>
 
             <label className="field">
               <span>Panel background opacity</span>
