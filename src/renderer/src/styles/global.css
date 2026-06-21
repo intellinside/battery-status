@@ -4,7 +4,10 @@
   --fg: #e8eaed;
   --fg-dim: #9aa0a6;
   --border: #3a3e45;
+  --bg-hover: #ffffff14;
   --accent: #4c8bf5;
+  --color-green: #4caf50;
+  --color-red: #f44336;
   color-scheme: dark;
 }
 

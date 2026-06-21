@@ -79,3 +79,12 @@ export interface ProbeResult {
 }
 
 export type WindowAction = 'closePanel' | 'openSettings' | 'openAbout' | 'quit'
+
+export type UpdateState = 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'error' | 'up-to-date'
+
+export interface UpdateStatus {
+  state: UpdateState
+  version?: string
+  progress?: number
+  error?: string
+}

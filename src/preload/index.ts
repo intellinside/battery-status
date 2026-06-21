@@ -4,6 +4,7 @@ import type {
   AppSettings,
   DeviceConfigPatch,
   DeviceView,
+  UpdateStatus,
   WindowAction
 } from '../shared/types'
 import { IPC } from '../shared/ipc'
@@ -45,7 +46,17 @@ const api = {
     ipcRenderer.send(IPC.PANEL_RESIZE, { width, height }),
 
   windowAction: (action: WindowAction): void =>
-    ipcRenderer.send(IPC.WINDOW_ACTION, action)
+    ipcRenderer.send(IPC.WINDOW_ACTION, action),
+
+  onUpdateStatus: (cb: (status: UpdateStatus) => void): (() => void) => {
+    const handler = (_e: unknown, status: UpdateStatus): void => cb(status)
+    ipcRenderer.on(IPC.UPDATE_STATUS, handler)
+    return () => ipcRenderer.removeListener(IPC.UPDATE_STATUS, handler)
+  },
+
+  checkForUpdate: (): Promise<void> => ipcRenderer.invoke(IPC.UPDATE_CHECK),
+
+  installUpdate: (): Promise<void> => ipcRenderer.invoke(IPC.UPDATE_INSTALL)
 }
 
 export type Api = typeof api

@@ -1,5 +1,6 @@
 import { app, Menu, Tray, nativeTheme } from 'electron'
 import { showAbout, showSettings, togglePanel } from './windows'
+import { checkForUpdates } from './updater'
 import { createTrayIcon } from './icons'
 
 let tray: Tray | null = null
@@ -15,6 +16,13 @@ export function createTray(): Tray {
   const menu = Menu.buildFromTemplate([
     { label: 'Settings', click: () => showSettings() },
     { label: 'About', click: () => showAbout() },
+    {
+      label: 'Check for Updates',
+      click: () => {
+        showAbout()
+        checkForUpdates()
+      }
+    },
     { type: 'separator' },
     {
       label: 'Quit',

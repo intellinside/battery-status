@@ -89,6 +89,7 @@ Devices whose battery Windows cannot read are still listed in the Devices tab (s
 | Build | Vite 7 |
 | Packaging | electron-builder (NSIS installer) |
 | Persistence | electron-store |
+| Auto-update | electron-updater (GitHub Releases) |
 | Device probe | `devicehelper.exe` — C# .NET 10, single-file self-contained, WinRT + Win32 P/Invoke |
 
 ### Commands
@@ -100,6 +101,14 @@ npm run build:helper # dotnet publish → src/main/scripts/devicehelper.exe  (re
 npm run dist         # build + package NSIS installer → dist/
 npm run dist:dir     # build + package unpacked directory (faster, no installer)
 ```
+
+To publish a new release to GitHub (requires `GH_TOKEN` with `repo` scope):
+
+```bash
+npm run dist -- --publish always
+```
+
+This builds the NSIS installer, generates `latest.yml` (used by `electron-updater` to detect new versions), and uploads both to the GitHub Releases page for the configured tag.
 
 TypeScript is the primary correctness check — there is no test suite. A type error will fail the build.
 
@@ -184,6 +193,9 @@ devicehelper.exe ──stdout JSON──► devicehelper.ts ──► poller.ts 
 | `app:info` | invoke | App name / version / author |
 | `panel:resize` | send (renderer → main) | Renderer reports content size so main resizes the frameless panel |
 | `window:action` | send (renderer → main) | `closePanel`, `openSettings`, `openAbout`, `quit` |
+| `update:status` | push (main → renderer) | Broadcast `UpdateStatus` on each updater state change |
+| `update:check` | invoke | Trigger an immediate update check |
+| `update:install` | invoke | Quit and install a downloaded update |
 
 ### Shared types (`src/shared/types.ts`)
 
@@ -197,6 +209,8 @@ devicehelper.exe ──stdout JSON──► devicehelper.ts ──► poller.ts 
 | `ChargingState` | `'charging' \| 'discharging' \| 'idle' \| 'unknown'` |
 | `DeviceType` | `'keyboard' \| 'mouse' \| 'headphones' \| 'controller' \| null` |
 | `PanelCorner` | `'top-left' \| 'top-right' \| 'bottom-left' \| 'bottom-right'` |
+| `UpdateState` | `'idle' \| 'checking' \| 'available' \| 'downloading' \| 'downloaded' \| 'error' \| 'up-to-date'` |
+| `UpdateStatus` | `{ state: UpdateState; version?: string; progress?: number; error?: string }` |
 
 ### Update loop (`poller.ts`)
 

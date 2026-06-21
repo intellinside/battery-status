@@ -19,6 +19,7 @@ import {
   reorderDevices,
   deleteDevice
 } from './store'
+import { initUpdater, checkForUpdates, installUpdate } from './updater'
 import type { AppInfo, AppSettings, DeviceConfigPatch, WindowAction } from '../shared/types'
 import { IPC } from '../shared/ipc'
 
@@ -53,6 +54,9 @@ async function start(): Promise<void> {
   applyAutoLaunch(settings.autoLaunch)
 
   startPolling((devices) => broadcast(IPC.DEVICES_UPDATE, devices))
+
+  initUpdater()
+  setTimeout(() => checkForUpdates(), 3000)
 
   if (settings.panelVisible) {
     showPanelOnStartup(t)
@@ -122,6 +126,9 @@ function registerWindowIpc(): void {
       author: 'intellinside <devbyside@gmail.com>'
     })
   )
+
+  ipcMain.handle(IPC.UPDATE_CHECK, () => checkForUpdates())
+  ipcMain.handle(IPC.UPDATE_INSTALL, () => installUpdate())
 
   ipcMain.on(IPC.WINDOW_ACTION, (_e, action: WindowAction) => {
     switch (action) {

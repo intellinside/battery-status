@@ -1,8 +1,12 @@
 {
   "name": "battery-status",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "description": "System-tray app showing the battery level of connected Bluetooth devices",
   "main": "out/main/index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/intellinside/battery-status.git"
+  },
   "author": {
     "name": "intellinside",
     "email": "devbyside@gmail.com"
@@ -18,7 +22,8 @@
     "dist:dir": "npm run build:helper && electron-vite build && electron-builder --dir"
   },
   "dependencies": {
-    "electron-store": "^8.2.0"
+    "electron-store": "^8.2.0",
+    "electron-updater": "^6.8.9"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

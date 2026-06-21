@@ -23,3 +23,7 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
+publish:
+  provider: github
+  owner: intellinside
+  repo: battery-status

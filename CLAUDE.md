@@ -79,9 +79,13 @@ New devices default `showOnPanel` and `warnEnabled` to `true` only when `battery
 | `app:info` | invoke | name/version/author |
 | `panel:resize` | send | renderer reports content size so main can resize the frameless panel |
 | `window:action` | send | `closePanel`, `openSettings`, `openAbout`, `quit` |
+| `update:status` | push | broadcast `UpdateStatus` on each updater state change |
+| `update:check` | invoke | trigger immediate update check |
+| `update:install` | invoke | quit and install downloaded update |
 
 ### Key design constraints
 
+- **Auto-update via electron-updater**: `src/main/updater.ts` — `initUpdater()` sets up event handlers; `checkForUpdates()` is called 3 s after startup (no-op in dev). `autoDownload: true` downloads silently; `autoInstallOnAppQuit: true` installs on next quit. Status broadcast on `update:status`. Tray menu "Check for Updates" opens the About page and triggers a manual check. Publish config in `electron-builder.yml` (`provider: github, owner: intellinside, repo: battery-status`); release with `npm run dist -- --publish always` (requires `GH_TOKEN`).
 - **Windows-only**: `devicehelper.exe` uses WinRT `DeviceWatcher`, `CM_Get_DevNode_Property` (cfgmgr32), and Win32 HID P/Invoke. No cross-platform fallback.
 - **Battery via cfgmgr32**: Windows BT AEP does not expose battery as a WinRT property. Battery is read via `CM_Get_DevNode_Property` P/Invoke on the `BTHENUM` device node (`DEVPKEY_Bluetooth_Battery`). The PnP watcher collects instance IDs for this purpose.
 - **devicehelper.exe ships as `extraResources`**: packaged to `resources/scripts/devicehelper.exe`; `devicehelper.ts` checks `resources/scripts/`, `<appPath>/src/main/scripts/`, and `__dirname` fallback paths.

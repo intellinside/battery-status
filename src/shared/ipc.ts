@@ -11,4 +11,7 @@ export const IPC = {
   APP_INFO: 'app:info',
   PANEL_RESIZE: 'panel:resize',
   WINDOW_ACTION: 'window:action',
+  UPDATE_STATUS: 'update:status',
+  UPDATE_CHECK: 'update:check',
+  UPDATE_INSTALL: 'update:install',
 } as const
