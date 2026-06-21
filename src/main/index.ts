@@ -61,6 +61,10 @@ async function start(): Promise<void> {
   if (settings.panelVisible) {
     showPanelOnStartup(t)
   }
+
+  // Keep running with no windows open.
+  // @ts-ignore
+  app.on('window-all-closed', (e: Electron.Event) => e.preventDefault())
 }
 
 function registerDeviceIpc(): void {
