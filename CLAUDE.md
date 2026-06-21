@@ -9,13 +9,16 @@ Windows system-tray Electron app that shows battery levels for paired Bluetooth 
 ## Commands
 
 ```bash
-npm run dev        # hot-reload dev mode (electron-vite dev)
-npm run build      # compile to out/
+npm run dev        # build:helper + hot-reload dev mode (electron-vite dev)
+npm run build      # build:helper + compile to out/
+npm run build:helper  # dotnet publish devicehelper (single-file self-contained) → src/main/scripts/devicehelper.exe
 npm run dist       # build + package NSIS installer → dist/
 npm run dist:dir   # build + package unpacked dir (faster, no installer)
 ```
 
 No test suite currently. TypeScript is the primary correctness check — the build will fail on type errors.
+
+**Build requirements:** .NET 10 SDK (for `build:helper`). Single-file self-contained — no runtime required on the target machine.
 
 ## Documentation
 
@@ -27,13 +30,21 @@ Any code change that affects architecture, settings, IPC channels, shared types,
 
 **Main** (`src/main/`) — Node.js process, owns all system access:
 - `index.ts` — entry point, wires IPC handlers, starts the polling loop, registers the `Alt+B` global hotkey to toggle the panel
-- `bluetooth.ts` — spawns `bt-battery.ps1` via `powershell.exe`, parses its JSON output into `ProbeResult[]`
-- `vendor.ts` — reads battery from HID devices that don't surface through Windows PnP (Razer via feature reports, DualSense via input reports); caches the last-working Razer HID path in `razerPath` to avoid reopening every interface each poll
-- `poller.ts` — merges both probe sources, derives charging state trend, fires low-battery `Notification`s, drives the interval timer; uses a `warned` Set to suppress duplicate low-battery notifications until the device recovers above the threshold
+- `devicehelper.ts` — manages the persistent `devicehelper.exe` child process; line-buffers stdout, parses JSON, auto-restarts on crash (max 5 retries). Exposes `startDeviceHelper`, `stopDeviceHelper`, `getLastDevices`, `requestRefresh`, `probeDevices` (compat shim).
+- `poller.ts` — event-driven: `startPolling` calls `startDeviceHelper` and fires `runOnce` on every C# push event; `reschedulePolling` → `requestRefresh`; `stopPolling` → `stopDeviceHelper`. No interval timer.
 - `store.ts` — `electron-store` wrapper; persists `DeviceRecord` registry + `AppSettings`; exposes `DeviceView` (adds `displayName`) to the renderer
 - `windows.ts` — creates/manages the three `BrowserWindow`s: floating panel, settings, about; `broadcast()` sends to all three simultaneously on every update
 - `tray.ts` — tray icon + context menu; left-click toggles panel, right-click shows menu (Settings / About / Quit)
 - `icons.ts` — generates the tray icon programmatically as an RGBA PNG via `nativeImage` (adapts to dark/light OS theme); the `trayTemplate.png` in resources is unused
+
+**C# helper** (`src/main/devicehelper/`) — `devicehelper.exe` (single-file self-contained, ~42 MB, .NET 10):
+- `Program.cs` — single-file implementation with three providers + DeviceManager:
+  - `BluetoothProvider` — three WinRT `DeviceWatcher`s: AEP BT Classic + AEP BT LE (both request `System.Devices.Aep.IsConnected` → `Updated` fires on connect/disconnect) + PnP (BTH nodes, `null` properties, for battery reads only); battery via `CM_Get_DevNode_Property` P/Invoke (`DEVPKEY_Bluetooth_Battery = {104EA319...} pid=2`); 60-second battery re-poll.
+  - `RazerProvider` — HID class GUID watcher (VID 0x1532); 30s poll timer; Razer openrazer protocol (class 0x07, cmd 0x80=battery, cmd 0x84=charging), txId=0x1f, battery = resp[10]/255×100; opens HID interfaces with `CreateFile(desiredAccess=0, FILE_FLAG_OVERLAPPED)` as a fallback when `GENERIC_READ|WRITE` fails (mirrors hidapi `open_rw=FALSE`) — this bypasses Synapse's exclusive HID lock because the kernel HID driver services `IOCTL_HID_SET/GET_FEATURE` without checking the handle's access mask
+  - `DualSenseProvider` — WinRT `HidDevice.GetDeviceSelector(0x0001, 0x0005)` watcher (VID 0x054C, PIDs 0x0CE6/0x0DF2); per-device read thread; MAC from feature report 0x09
+  - `DeviceManager` — 150ms debounce, emits `{"type":"snapshot"|"update","devices":[...]}` JSON lines to stdout
+- stdin: `"quit"` → graceful stop; `"refresh"` → immediate emit
+- stderr: diagnostic logs only (not parsed by Node.js)
 
 **Preload** (`src/preload/index.ts`) — bridges IPC to `window.api` via `contextBridge`. The exported `Api` type is the authoritative contract for what the renderer can call. Event listener methods (`onDevicesUpdate`, `onSettingsUpdate`) return an unsubscribe function for use in `useEffect` cleanup. IPC channel names are defined as constants in `src/shared/ipc.ts` (`IPC` object) — always use those, never raw strings.
 
@@ -45,12 +56,12 @@ Any code change that affects architecture, settings, IPC channels, shared types,
 ### Data flow
 
 ```
-bt-battery.ps1 ──┐
-                 ├─► poller.ts merge ──► store (DeviceRecord[]) ──► broadcast('devices:update') ──► renderer
-vendor HID     ──┘
+BluetoothProvider (WinRT DeviceWatcher) ──┐
+RazerProvider     (HID watcher + poll)   ──┼─► DeviceManager merge ──► stdout JSON ──► devicehelper.ts ──► poller.ts ──► store ──► broadcast ──► renderer
+DualSenseProvider (HID watcher + thread) ──┘
 ```
 
-The polling loop (`poller.ts`) runs on a configurable interval (`pollIntervalSec`). Each cycle runs both probes in parallel (`Promise.all`), merges results by device id (vendor HID takes priority for battery/charging), updates the `electron-store` registry, and broadcasts the new `DeviceView[]` to all open windows.
+`devicehelper.exe` runs as a persistent child process. On device connect/disconnect/battery-change events it emits a JSON line. `devicehelper.ts` in the main process line-buffers stdout, parses JSON, and invokes `onUpdate`. `poller.ts` calls `runOnce` synchronously on each event — no polling timer. `requestRefresh()` sends `"refresh\n"` to stdin triggering an immediate re-emit from C#.
 
 New devices default `showOnPanel` and `warnEnabled` to `true` only when `battery !== null` (i.e. unknown-battery devices are hidden by default).
 
@@ -71,12 +82,13 @@ New devices default `showOnPanel` and `warnEnabled` to `true` only when `battery
 
 ### Key design constraints
 
-- **Windows-only**: `bt-battery.ps1` uses `Win32_PnPEntity` / `Get-PnpDevice` / `DEVPKEY_Bluetooth_Battery`. There is no cross-platform fallback.
-- **node-hid is native**: `asarUnpack` in `electron-builder.yml` unpacks it so the `.node` binary is accessible at runtime.
-- **PowerShell script ships as `extraResources`**: packaged to `resources/scripts/bt-battery.ps1`; `bluetooth.ts` checks both dev and packaged paths.
+- **Windows-only**: `devicehelper.exe` uses WinRT `DeviceWatcher`, `CM_Get_DevNode_Property` (cfgmgr32), and Win32 HID P/Invoke. No cross-platform fallback.
+- **Battery via cfgmgr32**: Windows BT AEP does not expose battery as a WinRT property. Battery is read via `CM_Get_DevNode_Property` P/Invoke on the `BTHENUM` device node (`DEVPKEY_Bluetooth_Battery`). The PnP watcher collects instance IDs for this purpose.
+- **devicehelper.exe ships as `extraResources`**: packaged to `resources/scripts/devicehelper.exe`; `devicehelper.ts` checks `resources/scripts/`, `<appPath>/src/main/scripts/`, and `__dirname` fallback paths.
 - **Frameless transparent panel**: `resizable: false` on Windows blocks programmatic resize, so `windows.ts` toggles `setResizable` around every `setBounds` call.
-- **Charging state is inferred** for standard BT devices (level went up → charging, down → discharging, same → idle); vendor HID sources report it directly.
+- **Charging state is inferred** for standard BT devices (level went up → charging, down → discharging, same → idle); DualSense reports it directly via status byte nibble.
 - **Single-instance lock**: a second app launch re-focuses the settings window instead of spawning a new process.
+- **Razer HID access**: works with Razer Synapse running. Synapse holds MI_00 with an exclusive write lock (`shareMode=0`), but `CreateFile(desiredAccess=0)` always succeeds (Windows sharing rules only block access bits the caller *requests*), and the HID driver's `IOCTL_HID_SET/GET_FEATURE` doesn't validate the file handle's access mask — so `HidD_SetFeature`/`HidD_GetFeature` both work on zero-access handles.
 
 ### Shared types
 

@@ -6,3 +6,6 @@ dist/
 .vite/
 .idea/
 run.*.log
+src/main/scripts/devicehelper.*
+src/main/devicehelper/obj
+src/main/devicehelper/bin

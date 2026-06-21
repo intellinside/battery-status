@@ -3,6 +3,7 @@ export const IPC = {
   DEVICES_SET_CONFIG: 'devices:setConfig',
   DEVICES_REFRESH: 'devices:refresh',
   DEVICES_REORDER: 'devices:reorder',
+  DEVICES_DELETE: 'devices:delete',
   DEVICES_UPDATE: 'devices:update',
   SETTINGS_GET: 'settings:get',
   SETTINGS_SET: 'settings:set',

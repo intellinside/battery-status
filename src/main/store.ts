@@ -103,6 +103,12 @@ export function saveDevices(devices: Record<string, DeviceRecord>): void {
   store.set('devices', devices)
 }
 
+export function deleteDevice(id: string): void {
+  const devices = rawDevices()
+  delete devices[id]
+  store.set('devices', devices)
+}
+
 export function getDevicesMap(): Record<string, DeviceRecord> {
   return rawDevices()
 }

@@ -16,7 +16,8 @@ import {
   getSettings,
   setSettings,
   updateDeviceConfig,
-  reorderDevices
+  reorderDevices,
+  deleteDevice
 } from './store'
 import type { AppInfo, AppSettings, DeviceConfigPatch, WindowAction } from '../shared/types'
 import { IPC } from '../shared/ipc'
@@ -53,12 +54,9 @@ async function start(): Promise<void> {
 
   startPolling((devices) => broadcast(IPC.DEVICES_UPDATE, devices))
 
-  if (settings.panelVisible !== false) {
+  if (settings.panelVisible) {
     showPanelOnStartup(t)
   }
-
-  // Keep running with no windows open.
-  app.on('window-all-closed', (e: Electron.Event) => e.preventDefault())
 }
 
 function registerDeviceIpc(): void {
@@ -78,6 +76,13 @@ function registerDeviceIpc(): void {
 
   ipcMain.handle(IPC.DEVICES_REORDER, (_e, ids: string[]) => {
     const views = reorderDevices(ids)
+    broadcast(IPC.DEVICES_UPDATE, views)
+    return views
+  })
+
+  ipcMain.handle(IPC.DEVICES_DELETE, (_e, id: string) => {
+    deleteDevice(id)
+    const views = getDeviceViews()
     broadcast(IPC.DEVICES_UPDATE, views)
     return views
   })
@@ -136,5 +141,11 @@ function registerWindowIpc(): void {
   })
 }
 
-app.on('before-quit', () => stopPolling())
+let quitting = false
+app.on('before-quit', (e) => {
+  if (quitting) return
+  e.preventDefault()
+  quitting = true
+  stopPolling().then(() => app.quit())
+})
 app.on('will-quit', () => globalShortcut.unregisterAll())

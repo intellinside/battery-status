@@ -1,6 +1,5 @@
 import { Notification } from 'electron'
-import { probeDevices } from './bluetooth'
-import { probeVendorBattery } from './vendor'
+import { startDeviceHelper, stopDeviceHelper, getLastDevices, requestRefresh } from './devicehelper'
 import {
   getDevicesMap,
   getSettings,
@@ -15,7 +14,6 @@ type UpdateListener = (devices: DeviceView[]) => void
 /** Devices currently below their warning threshold that we've already notified about. */
 const warned = new Set<string>()
 
-let timer: NodeJS.Timeout | null = null
 let listener: UpdateListener | null = null
 
 function deriveCharging(prev: number | null, next: number): ChargingState {
@@ -43,18 +41,16 @@ function merge(results: ProbeResult[]): DeviceView[] {
       const prevKnown = existing?.lastBattery ?? null
       if (prevKnown !== null && prevKnown !== r.battery) prevBattery = prevKnown
       if (r.charging) {
-        // Source reports a real charging state (vendor HID) — trust it.
         charging = r.charging
       } else if (prevKnown !== null && prevKnown !== r.battery) {
         charging = deriveCharging(prevKnown, r.battery)
       } else if (prevKnown !== null && prevKnown === r.battery) {
         charging = 'idle'
       } else {
-        charging = 'unknown' // first known reading; need a second to infer
+        charging = 'unknown'
       }
       lastBattery = r.battery
     } else {
-      // Online but not reporting a level right now: keep last known %, drop trend.
       charging = r.charging ?? 'unknown'
     }
 
@@ -65,13 +61,28 @@ function merge(results: ProbeResult[]): DeviceView[] {
           -1
         )
 
+    // Auto-promote visibility when battery becomes known for the first time.
+    // If showOnPanel/warnEnabled defaulted to false because battery was initially null,
+    // flip them to true as soon as battery arrives — device should appear automatically.
+    // HID devices (id starts with "hid:") are physically connected — show by default even if
+    // battery is unreadable (e.g. Synapse holds exclusive lock on the feature-report interface).
+    // BT devices default to hidden when battery is null because they may just not be nearby.
+    const defaultVisible = r.battery !== null || r.id.startsWith('hid:')
+    const batteryFirstArrival = existing !== undefined && existing.lastBattery === null && r.battery !== null
+    const showOnPanel = existing === undefined
+      ? defaultVisible
+      : batteryFirstArrival && !existing.showOnPanel ? true : existing.showOnPanel
+    const warnEnabled = existing === undefined
+      ? r.battery !== null
+      : batteryFirstArrival && !existing.warnEnabled ? true : existing.warnEnabled
+
     const record: DeviceRecord = {
       id: r.id,
       name: r.name,
       address: r.address,
       alias: existing?.alias ?? null,
-      showOnPanel: existing?.showOnPanel ?? (r.battery !== null),
-      warnEnabled: existing?.warnEnabled ?? (r.battery !== null),
+      showOnPanel,
+      warnEnabled,
       warnThreshold: existing?.warnThreshold ?? settings.lowColorThreshold,
       lastBattery,
       prevBattery,
@@ -86,7 +97,6 @@ function merge(results: ProbeResult[]): DeviceView[] {
     evaluateWarning(record)
   }
 
-  // Devices not seen this poll are offline; keep their data for the Devices tab.
   for (const id of Object.keys(devices)) {
     if (!seen.has(id) && devices[id].online) {
       devices[id] = { ...devices[id], online: false, charging: 'unknown' }
@@ -105,7 +115,7 @@ function evaluateWarning(d: DeviceRecord): void {
       notifyLowBattery(d)
     }
   } else {
-    warned.delete(d.id) // recovered — allow a future warning
+    warned.delete(d.id)
   }
 }
 
@@ -118,56 +128,28 @@ function notifyLowBattery(d: DeviceRecord): void {
   }).show()
 }
 
-export async function runOnce(): Promise<void> {
-  const [bt, vendor] = await Promise.all([probeDevices(), probeVendorBattery()])
-  const views = merge(combineSources(bt, vendor))
+export function runOnce(): Promise<void> {
+  const devices = getLastDevices()
+  const views = merge(devices)
   listener?.(views)
-}
-
-/**
- * Merge the Bluetooth/PnP and vendor-HID probe results into one list keyed by id.
- * Vendor results override battery/charging for a matching device (e.g. DualSense over BT)
- * and otherwise add new entries (Razer dongle, USB DualSense).
- */
-function combineSources(bt: ProbeResult[], vendor: ProbeResult[]): ProbeResult[] {
-  const byId = new Map<string, ProbeResult>()
-  for (const r of bt) byId.set(r.id, r)
-  for (const v of vendor) {
-    const existing = byId.get(v.id)
-    if (existing) {
-      byId.set(v.id, {
-        ...existing,
-        name: existing.name || v.name,
-        online: true,
-        battery: v.battery ?? existing.battery,
-        charging: v.charging ?? existing.charging
-      })
-    } else {
-      byId.set(v.id, v)
-    }
-  }
-  return [...byId.values()]
+  requestRefresh()
+  return Promise.resolve()
 }
 
 export function startPolling(onUpdate: UpdateListener): void {
   listener = onUpdate
-  void runOnce()
-  scheduleNext()
+  startDeviceHelper((devices) => {
+    const views = merge(devices)
+    listener?.(views)
+  })
 }
 
-function scheduleNext(): void {
-  if (timer) clearInterval(timer)
-  const intervalMs = Math.max(10, getSettings().pollIntervalSec) * 1000
-  timer = setInterval(() => void runOnce(), intervalMs)
-}
-
-/** Re-read the interval from settings and restart the loop (call after settings change). */
+/** Re-read settings and propagate to helper (interval changes). */
 export function reschedulePolling(): void {
-  scheduleNext()
+  requestRefresh()
 }
 
-export function stopPolling(): void {
-  if (timer) clearInterval(timer)
-  timer = null
+export function stopPolling(): Promise<void> {
   listener = null
+  return stopDeviceHelper()
 }

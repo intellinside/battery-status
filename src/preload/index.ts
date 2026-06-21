@@ -19,6 +19,9 @@ const api = {
   reorderDevices: (ids: string[]): Promise<DeviceView[]> =>
     ipcRenderer.invoke(IPC.DEVICES_REORDER, ids),
 
+  deleteDevice: (id: string): Promise<DeviceView[]> =>
+    ipcRenderer.invoke(IPC.DEVICES_DELETE, id),
+
   onDevicesUpdate: (cb: (devices: DeviceView[]) => void): (() => void) => {
     const handler = (_e: unknown, devices: DeviceView[]): void => cb(devices)
     ipcRenderer.on(IPC.DEVICES_UPDATE, handler)

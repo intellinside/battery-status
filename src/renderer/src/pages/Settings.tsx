@@ -40,6 +40,10 @@ export default function Settings(): JSX.Element {
     window.api.setDeviceConfig(id, patch)
   }
 
+  const handleDeleteDevice = (id: string): void => {
+    window.api.deleteDevice(id)
+  }
+
   const handleDragStart = (id: string): void => {
     dragSrcId.current = id
     setDragging(true)
@@ -269,6 +273,7 @@ export default function Settings(): JSX.Element {
                       key={d.id}
                       device={d}
                       onChange={(p) => patchDevice(d.id, p)}
+                      onDelete={() => handleDeleteDevice(d.id)}
                       onDragStart={() => handleDragStart(d.id)}
                       onDragOver={(e) => handleDragOver(e, d.id)}
                       onDrop={() => handleDrop(d.id)}

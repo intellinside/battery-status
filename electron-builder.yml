@@ -8,13 +8,11 @@ directories:
 files:
   - out/**/*
   - package.json
-asarUnpack:
-  - "**/node_modules/node-hid/**"
 extraResources:
   - from: src/main/scripts
     to: scripts
     filter:
-      - "**/*.ps1"
+      - "devicehelper.exe"
 win:
   target:
     - nsis

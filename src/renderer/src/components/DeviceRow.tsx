@@ -7,6 +7,7 @@ import type { DeviceConfigPatch, DeviceType, DeviceView } from '../../../shared/
 interface Props {
   device: DeviceView
   onChange: (patch: DeviceConfigPatch) => void
+  onDelete: () => void
   onDragStart: () => void
   onDragOver: (e: React.DragEvent) => void
   onDrop: () => void
@@ -24,6 +25,7 @@ interface EditState {
 export default function DeviceRow({
   device,
   onChange,
+  onDelete,
   onDragStart,
   onDragOver,
   onDrop,
@@ -31,6 +33,7 @@ export default function DeviceRow({
   dropIndicator
 }: Props): JSX.Element {
   const [editOpen, setEditOpen] = useState(false)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [edit, setEdit] = useState<EditState>({
     alias: '',
     deviceType: null,
@@ -126,9 +129,8 @@ export default function DeviceRow({
         </td>
 
         <td className="col-edit">
-          <button className="edit-btn" onClick={openEdit}>
-            Edit
-          </button>
+          <button className="edit-btn" onClick={openEdit}>Edit</button>
+          <button className="delete-btn" onClick={() => setDeleteConfirmOpen(true)}>Delete</button>
         </td>
 
         <td className="col-drag">
@@ -144,6 +146,31 @@ export default function DeviceRow({
           </span>
         </td>
       </tr>
+
+      {deleteConfirmOpen &&
+        createPortal(
+          <div className="modal-overlay" onClick={() => setDeleteConfirmOpen(false)}>
+            <div className="modal" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.key === 'Escape' && setDeleteConfirmOpen(false)}>
+              <h3 className="modal__title">Delete device</h3>
+              <div className="modal__device-name">{device.displayName}</div>
+              <p className="modal__confirm-text">
+                Remove from app memory? If the device is detected again, it will be added back automatically.
+              </p>
+              <div className="modal__actions">
+                <button
+                  className="modal__delete"
+                  onClick={() => { onDelete(); setDeleteConfirmOpen(false) }}
+                >
+                  Delete
+                </button>
+                <button className="modal__cancel" onClick={() => setDeleteConfirmOpen(false)}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
 
       {editOpen &&
         createPortal(

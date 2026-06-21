@@ -18,7 +18,7 @@ Windows system-tray app that shows battery levels for paired Bluetooth devices a
 
 - Windows 10 or 11
 - Bluetooth adapter (for Bluetooth devices)
-- PowerShell (built into Windows — no additional install needed)
+- No runtime dependencies — `devicehelper.exe` is a self-contained .NET 10 binary
 
 ### Installation
 
@@ -70,8 +70,8 @@ Drag rows to reorder. Click **Refresh now** to force an immediate poll.
 
 | Category | How it works |
 |---|---|
-| Standard Bluetooth (keyboards, headphones, mice, …) | Windows PnP via `DEVPKEY_Bluetooth_Battery`; connection state from WinRT APIs |
-| Razer wireless mice (USB dongle) | Vendor HID feature report (class 0x07, commands 0x80 / 0x84) |
+| Standard Bluetooth (keyboards, headphones, mice, …) | WinRT `DeviceWatcher` for presence; battery via `CM_Get_DevNode_Property` (`DEVPKEY_Bluetooth_Battery`) |
+| Razer wireless mice (USB dongle) | HID feature report (class 0x07, cmd 0x80=battery); may not work when Razer Synapse is running |
 | Sony DualSense (USB or Bluetooth) | HID input report 0x01 (USB, byte 53) or 0x31 (BT, byte 54) |
 
 Devices whose battery Windows cannot read are still listed in the Devices tab (so you can hide them) but are hidden from the panel by default.
@@ -89,16 +89,16 @@ Devices whose battery Windows cannot read are still listed in the Devices tab (s
 | Build | Vite 7 |
 | Packaging | electron-builder (NSIS installer) |
 | Persistence | electron-store |
-| HID access | node-hid (native module, asar-unpacked) |
-| Bluetooth probe | PowerShell script via `child_process.execFile` |
+| Device probe | `devicehelper.exe` — C# .NET 10, single-file self-contained, WinRT + Win32 P/Invoke |
 
 ### Commands
 
 ```bash
-npm run dev        # hot-reload dev mode (electron-vite dev)
-npm run build      # compile TypeScript → out/
-npm run dist       # build + package NSIS installer → dist/
-npm run dist:dir   # build + package unpacked directory (faster, no installer)
+npm run dev          # build:helper + hot-reload dev mode
+npm run build        # build:helper + compile TypeScript → out/
+npm run build:helper # dotnet publish → src/main/scripts/devicehelper.exe  (requires .NET 10 SDK)
+npm run dist         # build + package NSIS installer → dist/
+npm run dist:dir     # build + package unpacked directory (faster, no installer)
 ```
 
 TypeScript is the primary correctness check — there is no test suite. A type error will fail the build.
@@ -109,15 +109,17 @@ TypeScript is the primary correctness check — there is no test suite. A type e
 src/
   main/           Node.js (main process)
     index.ts      Entry point, IPC handlers, app lifecycle
-    bluetooth.ts  PowerShell probe — parses Bluetooth battery via PnP
-    vendor.ts     HID probe — Razer and DualSense battery
-    poller.ts     Polling loop, merge, low-battery notifications
+    devicehelper.ts  Manages devicehelper.exe child process; parses JSON push events
+    poller.ts     Event-driven update loop, low-battery notifications
     store.ts      electron-store wrapper — DeviceRecord registry + AppSettings
     windows.ts    Three BrowserWindows: panel, settings, about
     tray.ts       Tray icon + context menu
     icons.ts      Tray icon generation
+    devicehelper/ C# .NET 10 project (built to scripts/)
+      devicehelper.csproj
+      Program.cs   BluetoothProvider + RazerProvider + DualSenseProvider + DeviceManager
     scripts/
-      bt-battery.ps1   PowerShell Bluetooth probe script
+      devicehelper.exe   self-contained binary (gitignored, built by build:helper)
   preload/
     index.ts      contextBridge — exposes window.api to the renderer
     index.d.ts    Type declaration for window.api
@@ -153,12 +155,15 @@ electron.vite.config.ts Vite config
 The app has three Electron processes with a strict one-way data flow:
 
 ```
-bt-battery.ps1 ──┐
-                 ├─► poller.ts (merge + warn) ──► store (DeviceRecord[]) ──► broadcast ──► renderer
-vendor HID     ──┘
+devicehelper.exe ──stdout JSON──► devicehelper.ts ──► poller.ts (warn) ──► store (DeviceRecord[]) ──► broadcast ──► renderer
+  BluetoothProvider (WinRT DeviceWatcher + CM P/Invoke)
+  RazerProvider     (HID watcher + feature reports)
+  DualSenseProvider (HID watcher + input reports)
 ```
 
-**Main process** (`src/main/`) owns all system access — filesystem, HID, PowerShell, notifications, windows, tray. It also registers the global hotkey **Alt+B** to toggle the panel.
+`devicehelper.exe` is a persistent C# helper process. It emits JSON lines on device connect/disconnect/battery events. `devicehelper.ts` manages its lifecycle (spawn, line-buffer, restart on crash). `poller.ts` calls `runOnce` on each push event — no interval timer.
+
+**Main process** (`src/main/`) owns all system access — filesystem, IPC, notifications, windows, tray. It also registers the global hotkey **Alt+B** to toggle the panel.
 
 **Preload** (`src/preload/index.ts`) bridges IPC to `window.api` via `contextBridge`. The exported `Api` type is the authoritative contract. IPC channel names are centralised in `src/shared/ipc.ts` as the `IPC` constants object — prefer it over raw string literals.
 
@@ -193,27 +198,26 @@ vendor HID     ──┘
 | `DeviceType` | `'keyboard' \| 'mouse' \| 'headphones' \| 'controller' \| null` |
 | `PanelCorner` | `'top-left' \| 'top-right' \| 'bottom-left' \| 'bottom-right'` |
 
-### Polling loop (`poller.ts`)
+### Update loop (`poller.ts`)
 
-Each cycle:
-1. Runs both probes in parallel (`Promise.all([probeDevices(), probeVendorBattery()])`).
-2. Merges results by device id — vendor HID results override battery/charging for matching devices and add new entries for dongle-only devices.
-3. Derives charging state for standard BT devices by comparing the new level to the previous one (up → charging, down → discharging, same → idle). Vendor sources report charging state directly.
-4. Updates the `electron-store` registry.
-5. Fires a Windows notification for any device below its threshold (suppressed until the device recovers above the threshold via a `warned` Set).
-6. Broadcasts the updated `DeviceView[]` to all open windows.
+Each `runOnce` call (triggered by a push event from `devicehelper.exe`):
+1. Reads the latest `ProbeResult[]` from `getLastDevices()` (cached in memory by `devicehelper.ts`).
+2. Derives charging state for standard BT devices by comparing the new level to the previous one (up → charging, down → discharging, same → idle). DualSense and Razer report charging state directly.
+3. Updates the `electron-store` registry.
+4. Fires a Windows notification for any device below its threshold (suppressed until the device recovers via a `warned` Set).
+5. Broadcasts the updated `DeviceView[]` to all open windows.
 
-### Bluetooth probe (`bluetooth.ts` + `bt-battery.ps1`)
+### Device helper (`devicehelper.ts` + `devicehelper.exe`)
 
-The PowerShell script enumerates all Bluetooth PnP entities via a fast CIM query (`Win32_PnPEntity WHERE PNPDeviceID LIKE 'BTH%'`), then batches the `DEVPKEY_Bluetooth_Battery` reads in a single pipeline over only the node types that can carry a level. Connection state uses WinRT `BluetoothDevice.GetDeviceSelectorFromConnectionStatus` (both classic and LE), which is more accurate than PnP `Status`.
+`devicehelper.ts` spawns `devicehelper.exe` once at startup. It line-buffers stdout, parses JSON (`{"type":"snapshot"|"update","devices":[...]}`) and calls `onUpdate`. On crash it auto-restarts (max 5 attempts, 2 s delay). Helper path: `resources/scripts/devicehelper.exe` (packaged) → `src/main/scripts/devicehelper.exe` (dev).
 
-The script path is resolved at runtime for both dev (`src/main/scripts/`) and packaged (`resources/scripts/`) layouts.
+**C# device providers** (in `devicehelper/Program.cs`):
 
-### Vendor HID probe (`vendor.ts`)
+- **BluetoothProvider**: Three WinRT `DeviceWatcher`s — AEP BT Classic and AEP BT LE (both request `System.Devices.Aep.IsConnected`; `Updated` fires on connect/disconnect); PnP BTH-node watcher (`null` properties, used only for battery reads). Battery read via `CM_Locate_DevNodeW` + `CM_Get_DevNode_PropertyW` (`DEVPKEY_Bluetooth_Battery = {104EA319-6EE2-4701-BD47-8DDBF425BBE5}` pid=2). 60-second background poll.
 
-**Razer**: sends feature report with class `0x07` / command `0x80` (battery) and `0x84` (charging) to the first responding HID collection of the Razer VID (`0x1532`). The responding path is cached in `razerPath` to avoid reopening every interface on each poll.
+- **RazerProvider** (VID `0x1532`): Generic HID class GUID watcher; tests `HidD_SetFeature`/`HidD_GetFeature` on each found interface; Razer protocol class=`0x07`, cmd `0x80`=battery (0–255 scale), `0x84`=charging.
 
-**DualSense** (VID `0x054c`, PIDs `0x0ce6` / `0x0df2`): reads input report `0x01` (USB, byte 53) or `0x31` (Bluetooth, byte 54). USB and Bluetooth appearances collapse to one device record by reading the controller's MAC from feature report `0x09`.
+- **DualSenseProvider** (VID `0x054C`, PIDs `0x0CE6`/`0x0DF2`): `HidDevice.GetDeviceSelector(0x0001, 0x0005)` selector; per-device read thread. USB and Bluetooth appearances collapse to one record by reading the controller's MAC from feature report `0x09` (bytes 1–6 reversed).
 
 ### Windows (`windows.ts`)
 
@@ -236,8 +240,8 @@ Four files need to change:
 
 ### Design constraints
 
-- **Windows-only.** The PowerShell script uses `Win32_PnPEntity`, `Get-PnpDevice`, `DEVPKEY_Bluetooth_Battery`, and WinRT APIs. There is no cross-platform fallback.
-- **node-hid is native.** `asarUnpack` in `electron-builder.yml` keeps the `.node` binary outside the asar archive so it can be loaded at runtime.
+- **Windows-only.** `devicehelper.exe` uses WinRT `DeviceWatcher`, `CM_Get_DevNode_Property` (cfgmgr32), and Win32 HID P/Invoke. No cross-platform fallback.
+- **devicehelper.exe ships in `extraResources`.** Packaged to `resources/scripts/devicehelper.exe` by electron-builder; `devicehelper.ts` checks both packaged and dev paths.
 - **Single-instance lock.** A second launch re-focuses the settings window instead of spawning a new process.
 - **No taskbar button.** `app.setAppUserModelId` is called but `app.dock` / taskbar presence is suppressed; the app is tray-only.
 
