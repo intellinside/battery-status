@@ -104,19 +104,16 @@ sealed class RazerProvider : IDeviceProvider
 
             if (!hit)
             {
-                if (!_devices.ContainsKey(devId) && ifaces.Count > 0)
-                {
-                    // Register as online-only so it appears in Settings even if battery unreadable.
-                    _devices[devId] = new DeviceState(devId, ifaces[0].Name, devId, true, null, null);
-                    changed = true;
-                }
-                else if (_devices.TryGetValue(devId, out var prev) && prev.Online)
+                if (_devices.TryGetValue(devId, out var prev) && prev.Online)
                 {
                     // All interface queries failed — device is physically gone but Removed event
                     // didn't fire yet (or won't). Mark offline so UI reflects actual state.
                     _devices[devId] = prev with { Online = false, Battery = null, Charging = null };
                     changed = true;
                 }
+                // Do not register a new device that hasn't responded to battery queries —
+                // wired USB mice expose HID interfaces but don't implement the Razer battery
+                // protocol, causing a spurious online→offline flicker on startup.
             }
         }
 
