@@ -1,6 +1,6 @@
 {
   "name": "battery-status",
-  "version": "1.5.4",
+  "version": "1.5.5",
   "description": "System-tray app showing the battery level of connected Bluetooth devices",
   "main": "out/main/index.js",
   "repository": {
