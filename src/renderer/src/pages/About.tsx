@@ -61,14 +61,24 @@ function UpdateStatusView({ status }: { status: UpdateStatus }): JSX.Element {
           v{status.version} ready — Restart to install
         </button>
       )
-    case 'error':
+    case 'error': {
+      const raw = status.error ?? 'Unknown error'
+      const summary = raw.toLowerCase().startsWith('cannot download')
+        ? 'Download failed'
+        : raw.length > 60
+          ? raw.slice(0, 57) + '…'
+          : raw
       return (
         <div className="about__update-error">
-          <span>Update error: {status.error}</span>
+          <span>{summary}</span>
+          {summary !== raw && (
+            <span className="about__update-error-detail" title={raw}>{raw}</span>
+          )}
           <button className="about__update-btn" onClick={() => window.api.checkForUpdate()}>
             Try again
           </button>
         </div>
       )
+    }
   }
 }
