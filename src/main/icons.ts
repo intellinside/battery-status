@@ -81,6 +81,77 @@ function drawBattery(size: number, r: number, g: number, b: number, a: number): 
   return px
 }
 
+function drawBatteryLevel(
+  size: number,
+  level: number,
+  dark: boolean,
+  warnThreshold: number,
+  lowThreshold: number
+): Uint8Array {
+  const px = new Uint8Array(size * size * 4)
+  const sc = (v: number) => Math.round(v * size / 64)
+
+  const [or, og, ob, oa]: [number, number, number, number] = dark
+    ? [255, 255, 255, 230]
+    : [30, 30, 30, 220]
+
+  let fr: number, fg: number, fb: number
+  if (level >= warnThreshold) {
+    ;[fr, fg, fb] = [80, 200, 80]
+  } else if (level >= lowThreshold) {
+    ;[fr, fg, fb] = [220, 160, 30]
+  } else {
+    ;[fr, fg, fb] = [220, 60, 60]
+  }
+
+  const setPixel = (x: number, y: number, r: number, g: number, b: number, a: number): void => {
+    if (x < 0 || x >= size || y < 0 || y >= size) return
+    const i = (y * size + x) * 4
+    px[i] = r; px[i + 1] = g; px[i + 2] = b; px[i + 3] = a
+  }
+
+  // Body centred vertically: 32 px tall in 64 px space → y 16..47
+  const bx1 = sc(2), by1 = sc(16), bx2 = sc(54), by2 = sc(47)
+  const border = Math.max(2, sc(5))
+
+  // Body outline
+  for (let x = bx1; x <= bx2; x++) {
+    for (let y = by1; y <= by2; y++) {
+      const isEdge = x <= bx1 + border - 1 || x >= bx2 - border + 1 ||
+                     y <= by1 + border - 1 || y >= by2 - border + 1
+      if (isEdge) setPixel(x, y, or, og, ob, oa)
+    }
+  }
+
+  // Nub centred in body, ~65 % of body height
+  const tx1 = sc(55), ty1 = sc(22), tx2 = sc(63), ty2 = sc(41)
+  for (let x = tx1; x <= tx2; x++) {
+    for (let y = ty1; y <= ty2; y++) setPixel(x, y, or, og, ob, oa)
+  }
+
+  // Interior fill left-to-right proportional to level
+  const ix1 = bx1 + border, iy1 = by1 + border
+  const ix2 = bx2 - border, iy2 = by2 - border
+  const innerWidth = ix2 - ix1 + 1
+  const fillWidth = Math.round(innerWidth * Math.max(0, Math.min(100, level)) / 100)
+  for (let x = ix1; x < ix1 + fillWidth; x++) {
+    for (let y = iy1; y <= iy2; y++) setPixel(x, y, fr, fg, fb, 220)
+  }
+
+  return px
+}
+
+export function createTrayIconWithBattery(
+  dark: boolean,
+  level: number,
+  warnThreshold: number,
+  lowThreshold: number
+): NativeImage {
+  const SIZE = 64
+  const png = writePng(SIZE, SIZE, drawBatteryLevel(SIZE, level, dark, warnThreshold, lowThreshold))
+  return nativeImage.createFromBuffer(png, { scaleFactor: 2 })
+}
+
 export function createTrayIcon(dark: boolean): NativeImage {
   // dark=true  → Windows is in dark mode → taskbar is dark → use white icon
   // dark=false → Windows is in light mode → taskbar is light → use dark icon

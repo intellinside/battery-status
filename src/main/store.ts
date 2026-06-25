@@ -18,7 +18,8 @@ const defaultSettings: AppSettings = {
   compactPanel: false,
   compactCircleSize: 48,
   warnColorThreshold: 40,
-  dynamicColorMode: false
+  dynamicColorMode: false,
+  trayDeviceId: null
 }
 
 const store = new Store<StoreSchema>({

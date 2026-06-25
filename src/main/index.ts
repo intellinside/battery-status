@@ -1,5 +1,5 @@
 import { app, globalShortcut, ipcMain } from 'electron'
-import { createTray } from './tray'
+import { createTray, updateTrayIcon } from './tray'
 import {
   broadcast,
   hidePanel,
@@ -20,8 +20,10 @@ import {
   deleteDevice
 } from './store'
 import { initUpdater, checkForUpdates, installUpdate } from './updater'
-import type { AppInfo, AppSettings, DeviceConfigPatch, WindowAction } from '../shared/types'
+import type { AppInfo, AppSettings, DeviceConfigPatch, DeviceView, WindowAction } from '../shared/types'
 import { IPC } from '../shared/ipc'
+
+let lastPolledDevices: DeviceView[] = []
 
 // Single-instance: a second launch should just surface the existing app.
 const gotLock = app.requestSingleInstanceLock()
@@ -53,7 +55,11 @@ async function start(): Promise<void> {
   const settings = getSettings()
   applyAutoLaunch(settings.autoLaunch)
 
-  startPolling((devices) => broadcast(IPC.DEVICES_UPDATE, devices))
+  startPolling((devices) => {
+    lastPolledDevices = devices
+    broadcast(IPC.DEVICES_UPDATE, devices)
+    updateTrayIcon(devices, getSettings())
+  })
 
   initUpdater()
   setTimeout(() => checkForUpdates(), 3000)
@@ -102,6 +108,7 @@ function registerSettingsIpc(): void {
   ipcMain.handle(IPC.SETTINGS_SET, (_e, patch: Partial<AppSettings>): AppSettings => {
     const next = setSettings(patch)
     broadcast(IPC.SETTINGS_UPDATE, next)
+    updateTrayIcon(lastPolledDevices, next)
 
     if (patch.autoLaunch !== undefined) applyAutoLaunch(next.autoLaunch)
     if (patch.pollIntervalSec !== undefined) reschedulePolling()

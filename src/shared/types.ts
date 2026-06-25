@@ -49,6 +49,8 @@ export interface AppSettings {
   warnColorThreshold: number
   /** When true, indicator color interpolates red→orange→green by percentage instead of fixed thresholds. */
   dynamicColorMode: boolean
+  /** Device ID to show battery level in the tray icon; null = show plain outline. */
+  trayDeviceId: string | null
 }
 
 export type PanelCorner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'

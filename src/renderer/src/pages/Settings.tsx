@@ -254,6 +254,7 @@ export default function Settings(): JSX.Element {
                 <thead>
                   <tr>
                     <th className="col-panel">Monitor</th>
+                    <th className="col-tray">Tray</th>
                     <th className="col-status">State</th>
                     <th className="col-type">Type</th>
                     <th>Device</th>
@@ -278,6 +279,12 @@ export default function Settings(): JSX.Element {
                         dropTarget?.id === d.id && dragSrcId.current !== d.id
                           ? dropTarget.position
                           : null
+                      }
+                      isTraySelected={settings?.trayDeviceId === d.id}
+                      onTrayToggle={() =>
+                        patchSettings({
+                          trayDeviceId: settings?.trayDeviceId === d.id ? null : d.id
+                        })
                       }
                     />
                   ))}

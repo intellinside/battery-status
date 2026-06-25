@@ -13,6 +13,8 @@ interface Props {
   onDrop: () => void
   onDragEnd: () => void
   dropIndicator: 'before' | 'after' | null
+  isTraySelected: boolean
+  onTrayToggle: () => void
 }
 
 interface EditState {
@@ -30,7 +32,9 @@ export default function DeviceRow({
   onDragOver,
   onDrop,
   onDragEnd,
-  dropIndicator
+  dropIndicator,
+  isTraySelected,
+  onTrayToggle
 }: Props): JSX.Element {
   const [editOpen, setEditOpen] = useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
@@ -85,6 +89,15 @@ export default function DeviceRow({
             type="checkbox"
             checked={device.showOnPanel}
             onChange={(e) => onChange({ showOnPanel: e.target.checked })}
+          />
+        </td>
+
+        <td className="col-tray">
+          <input
+            type="radio"
+            checked={isTraySelected}
+            onChange={() => { if (!isTraySelected) onTrayToggle() }}
+            onClick={() => { if (isTraySelected) onTrayToggle() }}
           />
         </td>
 
