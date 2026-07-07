@@ -12,6 +12,8 @@ interface Props {
   lowThreshold?: number
   warnColorThreshold?: number
   dynamicColorMode?: boolean
+  /** Full detail (both to-low and to-empty, or to-full), always shown in the tooltip. */
+  tooltipEstimate?: string | null
 }
 
 const STROKE_RATIO = 5.5 / 48
@@ -27,7 +29,8 @@ export default function CompactDeviceCircle({
   size = 48,
   lowThreshold = 20,
   warnColorThreshold = 40,
-  dynamicColorMode = false
+  dynamicColorMode = false,
+  tooltipEstimate = null
 }: Props): JSX.Element {
   const strokeW = Math.max(1.5, size * STROKE_RATIO)
   const r = (size - strokeW) / 2
@@ -42,7 +45,7 @@ export default function CompactDeviceCircle({
   const boltSize = Math.round(size * BOLT_RATIO)
 
   const tooltip = known
-    ? `${displayName} – ${pct}%${charging === 'charging' ? ' (charging)' : ''}`
+    ? `${displayName} – ${pct}%${charging === 'charging' ? ' (charging)' : ''}${tooltipEstimate ? ` – ${tooltipEstimate}` : ''}`
     : displayName
 
   return (
@@ -78,7 +81,7 @@ export default function CompactDeviceCircle({
         )}
       </svg>
 
-      {/* Device type icon */}
+      {/* Device type icon; the estimated time remaining is only shown in the tooltip. */}
       <div
         style={{
           position: 'absolute',

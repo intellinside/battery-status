@@ -48,6 +48,10 @@ async function start(): Promise<void> {
 
   const t = createTray()
   globalShortcut.register('Alt+B', () => togglePanel(t))
+  globalShortcut.register('Alt+Shift+B', () => {
+    const next = setSettings({ compactPanel: !getSettings().compactPanel })
+    broadcast(IPC.SETTINGS_UPDATE, next)
+  })
   registerDeviceIpc()
   registerSettingsIpc()
   registerWindowIpc()

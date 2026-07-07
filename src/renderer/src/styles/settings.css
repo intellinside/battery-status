@@ -167,6 +167,14 @@
   gap: 6px;
 }
 
+.col-battery__estimate {
+  font-size: 10.5px;
+  color: var(--fg-dim);
+  opacity: 0.8;
+  white-space: nowrap;
+  margin-top: 2px;
+}
+
 .col-panel {
   width: 1%;
   white-space: nowrap;
@@ -188,6 +196,14 @@
   color: var(--fg-dim);
   font-size: 12px;
   white-space: nowrap;
+}
+
+.col-warn__estimate {
+  font-size: 10.5px;
+  color: var(--fg-dim);
+  opacity: 0.8;
+  white-space: nowrap;
+  margin-top: 2px;
 }
 
 .warn-pct {

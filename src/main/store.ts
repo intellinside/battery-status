@@ -1,5 +1,6 @@
 import Store from 'electron-store'
 import type { AppSettings, DeviceRecord, DeviceConfigPatch, DeviceView } from '../shared/types'
+import { computeDisplayRates } from './estimate'
 
 interface StoreSchema {
   settings: AppSettings
@@ -19,7 +20,8 @@ const defaultSettings: AppSettings = {
   compactCircleSize: 48,
   warnColorThreshold: 40,
   dynamicColorMode: false,
-  trayDeviceId: null
+  trayDeviceId: null,
+  showTimeEstimate: true
 }
 
 const store = new Store<StoreSchema>({
@@ -58,7 +60,14 @@ function stripQuotes(s: string): string {
 }
 
 function toView(d: DeviceRecord): DeviceView {
-  return { ...d, name: stripQuotes(d.name), displayName: resolveDisplayName(d) }
+  const { fromHistory, ...rates } = computeDisplayRates(d, Date.now())
+  return {
+    ...d,
+    name: stripQuotes(d.name),
+    displayName: resolveDisplayName(d),
+    ...rates,
+    estimateFromHistory: fromHistory
+  }
 }
 
 /** All registry devices, sorted by user-defined sortOrder (then lastSeen as tie-breaker). */

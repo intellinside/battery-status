@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import BatteryIcon from './BatteryIcon'
 import DeviceTypeIcon from './DeviceTypeIcon'
 import type { DeviceConfigPatch, DeviceType, DeviceView } from '../../../shared/types'
+import { estimateRemaining, formatDuration } from '../utils/battery'
 
 interface Props {
   device: DeviceView
@@ -65,6 +66,15 @@ export default function DeviceRow({
     })
     setEditOpen(false)
   }
+
+  const { toEmptyMs, toWarnMs, toFullMs } = estimateRemaining(device, Date.now())
+  const estimatePrefix = device.estimateFromHistory ? '~' : ''
+  const batteryEstimate =
+    device.charging === 'charging' && toFullMs !== null
+      ? `${estimatePrefix}${formatDuration(toFullMs)} to full`
+      : device.charging === 'discharging' && toEmptyMs !== null
+        ? `${estimatePrefix}${formatDuration(toEmptyMs)} to empty`
+        : null
 
   const rowClass = [
     device.online ? '' : 'row--offline',
@@ -133,11 +143,15 @@ export default function DeviceRow({
             <BatteryIcon level={device.lastBattery} charging={device.charging} size={28} />
             <span>{device.lastBattery !== null ? `${device.lastBattery}%` : '—'}</span>
           </div>
+          {batteryEstimate && <div className="col-battery__estimate">{batteryEstimate}</div>}
         </td>
 
         <td className="col-warn">
           {device.warnEnabled && (
             <span className="warn-label">{device.warnThreshold + '%'}</span>
+          )}
+          {device.warnEnabled && toWarnMs !== null && (
+            <div className="col-warn__estimate">{estimatePrefix}{formatDuration(toWarnMs)}</div>
           )}
         </td>
 

@@ -12,6 +12,7 @@ Windows system-tray app that shows battery levels for paired Bluetooth devices a
 - Sends a Windows notification when a device drops below its configured threshold
 - Supports Razer wireless mice (via USB dongle) and Sony DualSense controllers, whose battery level Windows does not expose through the standard Bluetooth API
 - Shows charging state (charging / discharging / idle) for each device
+- Estimates time remaining to empty, to the low-battery threshold, or to full charge, based on the average rate observed since the device last changed direction
 - Lives entirely in the system tray — no taskbar presence
 
 ### Requirements
@@ -24,16 +25,22 @@ Windows system-tray app that shows battery levels for paired Bluetooth devices a
 
 1. Download the NSIS installer from the Releases page and run it.
 2. The app starts automatically and places an icon in the system tray.
-3. The app starts in the system tray. Left-click the tray icon to show/hide the panel; right-click for Settings, About, and Quit. The hotkey **Alt+B** also toggles the panel.
+3. The app starts in the system tray. Left-click the tray icon to show/hide the panel; right-click for Settings, About, and Quit. The hotkey **Alt+B** also toggles the panel; **Alt+Shift+B** toggles between list and compact view.
 
 ### Panel
 
-The floating panel appears in a corner of the screen and lists every device that is currently connected and configured to be shown. Toggle it with a left-click on the tray icon or with **Alt+B**. Two display modes are available:
+The floating panel appears in a corner of the screen and lists every device that is currently connected and configured to be shown. Toggle it with a left-click on the tray icon or with **Alt+B**. Two display modes are available, switchable via **Alt+Shift+B** or the "Compact panel view" checkbox in Settings:
 
 - **List view** (default) — device name + battery percentage with a coloured battery icon
 - **Compact view** — a horizontal strip of circular battery rings (configurable size)
 
 The panel snaps to a screen corner. You can drag the corner and offset positions in Settings.
+
+### Time estimates
+
+Once a device has been discharging (or charging) for at least a few minutes with an observed change in level, the panel shows an estimate on its own line below the device row: time to reach the low-battery threshold and time to reach 0% while discharging, or time to reach 100% while charging. The estimate is the average rate over the current discharge/charge streak (not a single instantaneous sample), and it counts down continuously between actual battery readings — in both the floating panel and the Settings devices table. Starting to charge discards any accumulated discharge statistics, and vice versa. Toggle this off in Settings if you'd rather not see it in the full (non-compact) panel; in compact ring mode the estimate is always available via hover tooltip regardless of this setting, but is never shown inside the ring itself.
+
+Each device also remembers a long-term average rate from past discharge/charge streaks. Right after a streak resets — e.g. the device just started discharging again — the app shows this remembered average immediately, marked with a `~` prefix (e.g. `~2h 15m to empty`), instead of leaving the estimate blank for the first few minutes. Once the current streak itself has enough data, the `~` disappears and the estimate switches to the live figure.
 
 ### Settings — General tab
 
@@ -41,6 +48,7 @@ The panel snaps to a screen corner. You can drag the corner and offset positions
 |---|---|---|
 | Refresh interval | 60 s | How often battery levels are polled |
 | Dynamic indicator color | Off | Interpolates battery color smoothly from red (≤15%) through orange to green (100%); when off, fixed thresholds apply |
+| Show estimated time remaining | On | Shows time-to-empty / time-to-low / time-to-full text under each device row, once enough discharge/charge data has been observed. Only affects the full (non-compact) panel — compact ring mode always exposes the estimate via hover tooltip instead |
 | Low-battery threshold | 20 % | Battery icon turns red at or below this level; also the default warning threshold for newly discovered devices (fixed-threshold mode only) |
 | Warn color threshold | 40 % | Battery icon turns orange between the low and warn thresholds (fixed-threshold mode only) |
 | Panel background opacity | 85 % | Transparency of the floating panel |
@@ -121,6 +129,7 @@ src/
     devicehelper.ts  Manages devicehelper.exe child process; parses JSON push events
     poller.ts     Event-driven update loop, low-battery notifications
     store.ts      electron-store wrapper — DeviceRecord registry + AppSettings
+    estimate.ts   Average discharge/charge rate (%/ms) over the current streak, plus a persisted long-term average used as a fallback
     windows.ts    Three BrowserWindows: panel, settings, about
     tray.ts       Tray icon + context menu
     icons.ts      Tray icon generation
@@ -148,7 +157,7 @@ src/
         useDevices.ts   Subscribes to devices:update IPC push events
         useSettings.ts  Subscribes to settings:update IPC push events
       utils/
-        battery.ts      levelColor() and isWarning() helpers for color computation
+        battery.ts      levelColor()/isWarning() for color; estimateRemaining()/estimateLabel()/formatDuration() for the time-remaining countdown
   shared/
     types.ts      Shared type contracts (ProbeResult, DeviceRecord, DeviceView, AppSettings, …)
     ipc.ts        IPC channel name constants (IPC object)
@@ -172,7 +181,7 @@ devicehelper.exe ──stdout JSON──► devicehelper.ts ──► poller.ts 
 
 `devicehelper.exe` is a persistent C# helper process. It emits JSON lines on device connect/disconnect/battery events. `devicehelper.ts` manages its lifecycle (spawn, line-buffer, restart on crash). `poller.ts` calls `runOnce` on each push event — no interval timer.
 
-**Main process** (`src/main/`) owns all system access — filesystem, IPC, notifications, windows, tray. It also registers the global hotkey **Alt+B** to toggle the panel.
+**Main process** (`src/main/`) owns all system access — filesystem, IPC, notifications, windows, tray. It also registers the global hotkeys **Alt+B** (toggle the panel) and **Alt+Shift+B** (toggle compact/full panel mode).
 
 **Preload** (`src/preload/index.ts`) bridges IPC to `window.api` via `contextBridge`. The exported `Api` type is the authoritative contract. IPC channel names are centralised in `src/shared/ipc.ts` as the `IPC` constants object — prefer it over raw string literals.
 
@@ -202,8 +211,8 @@ devicehelper.exe ──stdout JSON──► devicehelper.ts ──► poller.ts 
 | Type | Description |
 |---|---|
 | `ProbeResult` | Raw row from a probe (bluetooth or vendor HID) |
-| `DeviceRecord` | Persisted device entry (registry + battery history) |
-| `DeviceView` | `DeviceRecord` + `displayName`; what the renderer receives |
+| `DeviceRecord` | Persisted device entry (registry + battery history + discharge/charge streak anchors + long-term `avgDischargeRatePctPerMs`/`avgChargeRatePctPerMs`) |
+| `DeviceView` | `DeviceRecord` + `displayName` + `estimatedDischargeRatePctPerMs`/`estimatedChargeRatePctPerMs`/`estimateFromHistory`; what the renderer receives |
 | `AppSettings` | All persisted settings (includes `lowColorThreshold`, `warnColorThreshold`, `dynamicColorMode` for indicator color) |
 | `DeviceConfigPatch` | Partial patch applied by `devices:setConfig` |
 | `ChargingState` | `'charging' \| 'discharging' \| 'idle' \| 'unknown'` |
@@ -217,9 +226,10 @@ devicehelper.exe ──stdout JSON──► devicehelper.ts ──► poller.ts 
 Each `runOnce` call (triggered by a push event from `devicehelper.exe`):
 1. Reads the latest `ProbeResult[]` from `getLastDevices()` (cached in memory by `devicehelper.ts`).
 2. Derives charging state for standard BT devices by comparing the new level to the previous one (up → charging, down → discharging, same → idle). DualSense and Razer report charging state directly.
-3. Updates the `electron-store` registry.
-4. Fires a Windows notification for any device below its threshold (suppressed until the device recovers via a `warned` Set).
-5. Broadcasts the updated `DeviceView[]` to all open windows.
+3. Resets the discharge or charge streak anchor (`dischargeStart{Battery,Time}` / `chargeStart{Battery,Time}` on `DeviceRecord`, persisted across restarts) when reconnecting after being offline for more than 10 minutes, or when there's no carried-forward anchor for the new direction yet; otherwise carries the existing anchor forward — so idle polls (a reading with no % change), brief BT dropouts, and app restarts (where a still-connected device may miss the first probe cycle while `devicehelper.exe` re-enumerates) don't reset the average. `estimate.ts`'s `computeEstimateRates()` turns an anchor into a %/ms rate once enough streak time/delta has accumulated, and each validated rate is blended (via `updateAverageRate()`) into the persisted `avgDischargeRatePctPerMs`/`avgChargeRatePctPerMs`. `computeDisplayRates()` prefers the live rate but falls back to that persisted average right after a reset, so the panel doesn't go blank while the new streak warms up; the renderer projects the resulting rate forward against its own clock (`estimateRemaining()` in `utils/battery.ts`) so the displayed countdown ticks down between actual readings.
+4. Updates the `electron-store` registry.
+5. Fires a Windows notification for any device below its threshold (suppressed until the device recovers via a `warned` Set).
+6. Broadcasts the updated `DeviceView[]` to all open windows.
 
 ### Device helper (`devicehelper.ts` + `devicehelper.exe`)
 

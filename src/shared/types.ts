@@ -20,11 +20,29 @@ export interface DeviceRecord {
   lastSeen: number
   sortOrder?: number
   deviceType: DeviceType
+  /** Battery level when the current discharge streak began; null when not discharging. */
+  dischargeStartBattery: number | null
+  /** Epoch ms when the current discharge streak began. */
+  dischargeStartTime: number | null
+  /** Battery level when the current charge streak began; null when not charging. */
+  chargeStartBattery: number | null
+  /** Epoch ms when the current charge streak began. */
+  chargeStartTime: number | null
+  /** Long-term average discharge rate (%/ms), updated (EMA) each time a streak's live rate is validated; survives streak resets. */
+  avgDischargeRatePctPerMs: number | null
+  /** Long-term average charge rate (%/ms), updated (EMA) each time a streak's live rate is validated; survives streak resets. */
+  avgChargeRatePctPerMs: number | null
 }
 
 /** Device shape as it leaves the renderer-facing API (adds resolved display name). */
 export interface DeviceView extends DeviceRecord {
   displayName: string
+  /** Average discharge rate (%/ms) over the current streak; null until enough data is observed. */
+  estimatedDischargeRatePctPerMs: number | null
+  /** Average charge rate (%/ms) over the current streak; null until enough data is observed. */
+  estimatedChargeRatePctPerMs: number | null
+  /** True when the estimated rate above came from the persisted long-term average rather than the current live streak. */
+  estimateFromHistory: boolean
 }
 
 export interface AppSettings {
@@ -51,6 +69,8 @@ export interface AppSettings {
   dynamicColorMode: boolean
   /** Device ID to show battery level in the tray icon; null = show plain outline. */
   trayDeviceId: string | null
+  /** Show estimated time remaining/to-full on the panel. */
+  showTimeEstimate: boolean
 }
 
 export type PanelCorner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'

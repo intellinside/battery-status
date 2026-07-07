@@ -7,6 +7,7 @@ import {
   getDeviceViews,
   resolveDisplayName
 } from './store'
+import { computeEstimateRates, updateAverageRate } from './estimate'
 import type { ChargingState, DeviceRecord, DeviceView, ProbeResult } from '../shared/types'
 
 type UpdateListener = (devices: DeviceView[]) => void
@@ -54,6 +55,41 @@ function merge(results: ProbeResult[]): DeviceView[] {
       charging = r.charging ?? 'unknown'
     }
 
+    // Track the start of the current discharge/charge streak so an average rate can be
+    // computed over it. Reset on reconnecting after a real offline gap (which would otherwise
+    // leave a stale anchor) or when there's no carried-forward anchor for this direction yet
+    // (fresh device, or the opposite direction just cleared it); otherwise carry forward so
+    // idle polls — a device reporting the same battery % between ticks, or brief blips like an
+    // app restart's device-enumeration warm-up — don't reset the streak. Gating on the anchor
+    // (not the literal previous `charging` value) matters because `charging` flips to 'idle'
+    // on every no-change poll, which would otherwise make *every* real battery-% change look
+    // like the start of a new streak and the average would never accumulate enough time/delta.
+    const RECONNECT_RESET_GAP_MS = 10 * 60 * 1000
+    const wasOffline = existing !== undefined && !existing.online
+    const justReconnected = wasOffline && r.online && now - existing.lastSeen > RECONNECT_RESET_GAP_MS
+
+    let dischargeStartBattery = existing?.dischargeStartBattery ?? null
+    let dischargeStartTime = existing?.dischargeStartTime ?? null
+    let chargeStartBattery = existing?.chargeStartBattery ?? null
+    let chargeStartTime = existing?.chargeStartTime ?? null
+
+    const enteringDischarge =
+      lastBattery !== null && charging === 'discharging' && (justReconnected || dischargeStartTime === null)
+    const enteringCharge =
+      lastBattery !== null && charging === 'charging' && (justReconnected || chargeStartTime === null)
+
+    if (enteringDischarge) {
+      dischargeStartBattery = lastBattery
+      dischargeStartTime = now
+      chargeStartBattery = null
+      chargeStartTime = null
+    } else if (enteringCharge) {
+      chargeStartBattery = lastBattery
+      chargeStartTime = now
+      dischargeStartBattery = null
+      dischargeStartTime = null
+    }
+
     const maxOrder = existing
       ? -1
       : Object.values(devices).reduce(
@@ -90,8 +126,31 @@ function merge(results: ProbeResult[]): DeviceView[] {
       online: r.online,
       lastSeen: now,
       deviceType: existing?.deviceType ?? null,
+      dischargeStartBattery,
+      dischargeStartTime,
+      chargeStartBattery,
+      chargeStartTime,
+      avgDischargeRatePctPerMs: existing?.avgDischargeRatePctPerMs ?? null,
+      avgChargeRatePctPerMs: existing?.avgChargeRatePctPerMs ?? null,
       ...(existing ? { sortOrder: existing.sortOrder } : { sortOrder: maxOrder + 1 })
     }
+
+    // Blend a newly-validated live rate into the persisted long-term average, so it's
+    // available as a fallback estimate the next time this streak resets.
+    const live = computeEstimateRates(record, now)
+    if (live.estimatedDischargeRatePctPerMs !== null) {
+      record.avgDischargeRatePctPerMs = updateAverageRate(
+        record.avgDischargeRatePctPerMs,
+        live.estimatedDischargeRatePctPerMs
+      )
+    }
+    if (live.estimatedChargeRatePctPerMs !== null) {
+      record.avgChargeRatePctPerMs = updateAverageRate(
+        record.avgChargeRatePctPerMs,
+        live.estimatedChargeRatePctPerMs
+      )
+    }
+
     devices[r.id] = record
 
     evaluateWarning(record)
@@ -99,7 +158,10 @@ function merge(results: ProbeResult[]): DeviceView[] {
 
   for (const id of Object.keys(devices)) {
     if (!seen.has(id) && devices[id].online) {
-      devices[id] = { ...devices[id], online: false, charging: 'unknown' }
+      // Keep the last known charging direction — a device missing from one probe cycle
+      // (e.g. still enumerating right after app restart) shouldn't look like a fresh
+      // reconnect and discard its discharge/charge streak when it reappears moments later.
+      devices[id] = { ...devices[id], online: false }
     }
   }
 

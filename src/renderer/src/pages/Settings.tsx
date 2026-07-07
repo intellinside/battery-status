@@ -27,6 +27,23 @@ export default function Settings(): JSX.Element {
     window.api.getSettings().then(setSettings)
   }, [])
 
+  // Forces a re-render aligned to wall-clock minute boundaries (not window-mount time) so
+  // the estimated-time text updates in sync across every open window, instead of drifting
+  // out of phase with other windows that mounted at a different moment.
+  const [, forceTick] = useState(0)
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval>
+    const msToNextMinute = 60_000 - (Date.now() % 60_000)
+    const timeout = setTimeout(() => {
+      forceTick((n) => n + 1)
+      interval = setInterval(() => forceTick((n) => n + 1), 60_000)
+    }, msToNextMinute)
+    return () => {
+      clearTimeout(timeout)
+      clearInterval(interval)
+    }
+  }, [])
+
   useEffect(() => {
     if (!dragging) setLocalDevices(devices)
   }, [devices, dragging])
@@ -126,6 +143,15 @@ export default function Settings(): JSX.Element {
                 onChange={(e) => patchSettings({ dynamicColorMode: e.target.checked })}
               />
               <span>Dynamic indicator color</span>
+            </label>
+
+            <label className="field field--check">
+              <input
+                type="checkbox"
+                checked={settings.showTimeEstimate}
+                onChange={(e) => patchSettings({ showTimeEstimate: e.target.checked })}
+              />
+              <span>Show estimated time remaining</span>
             </label>
 
             <label className="field">

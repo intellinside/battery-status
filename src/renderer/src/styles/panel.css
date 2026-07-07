@@ -20,15 +20,22 @@
 
 .device {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  flex-direction: column;
+  gap: 2px;
   padding: 7px 8px;
   border-radius: 6px;
   min-width: 0;
 }
 .device--offline {
   opacity: 0.5;
+}
+
+.device__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
 }
 
 .device__left {
@@ -50,6 +57,14 @@
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
+}
+
+.device__estimate {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+  white-space: nowrap;
+  font-weight: 400;
+  text-align: right;
 }
 
 .device__battery {
